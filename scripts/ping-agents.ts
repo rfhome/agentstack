@@ -31,7 +31,7 @@ async function pingOpenAI() {
 
 async function pingGemini() {
   const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-  const model = client.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = client.getGenerativeModel({ model: "gemini-2.0-flash" });
   const start = Date.now();
   const res = await model.generateContent("Reply with: Lens online.");
   const text = res.response.text();
@@ -40,8 +40,13 @@ async function pingGemini() {
 
 async function main() {
   console.log("Pinging all agents...\n");
-  await Promise.all([pingAnthropic(), pingOpenAI(), pingGemini()]);
-  console.log("\nAll agents reachable.");
+  const results = await Promise.allSettled([pingAnthropic(), pingOpenAI(), pingGemini()]);
+  const failures = results.filter((r) => r.status === "rejected");
+  if (failures.length === 0) {
+    console.log("\nAll agents reachable.");
+  } else {
+    console.log(`\n${failures.length} agent(s) failed — see errors above.`);
+  }
 }
 
 main().catch((err) => {
