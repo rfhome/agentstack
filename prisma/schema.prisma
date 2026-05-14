@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Session {
+  id                Int              @id @default(autoincrement())
+  date              DateTime         @default(now())
+  cycleDay          Int?
+  cycleNumber       Int?
+  durationMinutes   Int?
+  avgHeartRate      Int?
+  cardioLoad        Int?
+  activeZoneMinutes Int?
+  rating            String?
+  notes             String?
+  exercises         Exercise[]
+  agentLogs         AgentLog[]
+  recommendations   Recommendation[]
+  createdAt         DateTime         @default(now())
+}
+
+model Exercise {
+  id        Int     @id @default(autoincrement())
+  session   Session @relation(fields: [sessionId], references: [id])
+  sessionId Int
+  name      String
+  sets      Int?
+  reps      String?
+  weightLbs Float?
+  notes     String?
+}
+
+model AgentLog {
+  id        Int      @id @default(autoincrement())
+  session   Session? @relation(fields: [sessionId], references: [id])
+  sessionId Int?
+  agentName String
+  model     String
+  domain    String
+  prompt    String
+  response  String
+  latencyMs Int?
+  createdAt DateTime @default(now())
+}
+
+model Recommendation {
+  id          Int      @id @default(autoincrement())
+  session     Session? @relation(fields: [sessionId], references: [id])
+  sessionId   Int?
+  domain      String
+  content     String
+  nextActions Json
+  createdAt   DateTime @default(now())
+}
+
+model Goal {
+  id              Int       @id @default(autoincrement())
+  exercise        String
+  targetWeightLbs Float?
+  targetReps      String?
+  cycleNumber     Int?
+  achieved        Boolean   @default(false)
+  achievedAt      DateTime?
+  createdAt       DateTime  @default(now())
+}
+
+model UserProfile {
+  id        Int      @id @default(1)
+  name      String   @default("Roberto")
+  context   String
+  updatedAt DateTime @updatedAt
+}
