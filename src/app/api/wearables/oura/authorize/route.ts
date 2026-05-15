@@ -1,29 +1,20 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { cookies } from "next/headers";
-import crypto from "crypto";
 
 const OURA_AUTH_URL = "https://cloud.ouraring.com/oauth/authorize";
 const SCOPES = "email personal daily heartrate workout tag";
 
 export async function GET() {
   const session = await auth();
+  const base = process.env.AUTH_URL ?? "http://localhost:3000";
+
   if (!session?.user?.id) {
-    return NextResponse.redirect(new URL("/auth/signin", process.env.AUTH_URL ?? "http://localhost:3000"));
+    return NextResponse.redirect(`${base}/auth/signin`);
   }
 
-  // CSRF state — stored in a cookie, verified in callback
-  const state = crypto.randomBytes(16).toString("hex");
-  const cookieStore = await cookies();
-  cookieStore.set("oura_oauth_state", state, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 600, // 10 min
-    path: "/",
-  });
-
-  const redirectUri = `${process.env.AUTH_URL ?? "http://localhost:3000"}/api/wearables/oura/callback`;
+  // Encode userId in state — verified in callback against the active session
+  const state = Buffer.from(session.user.id).toString("base64url");
+  const redirectUri = `${base}/api/wearables/oura/callback`;
 
   const url = new URL(OURA_AUTH_URL);
   url.searchParams.set("response_type", "code");
