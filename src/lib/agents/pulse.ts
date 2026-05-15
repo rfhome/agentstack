@@ -17,7 +17,7 @@ CRITICAL: Your entire response must be a single valid JSON object. Do not write 
 }`;
 
 export async function runPulse(input: AgentInput): Promise<AgentResponse> {
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const start = Date.now();
   const prompt = JSON.stringify(input, null, 2);
 
@@ -31,9 +31,11 @@ export async function runPulse(input: AgentInput): Promise<AgentResponse> {
   const latencyMs = Date.now() - start;
   const text = (msg.content[0] as { type: string; text: string }).text;
 
+  const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+
   let parsed: AgentResponse;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(clean);
   } catch {
     parsed = {
       agentName: "Pulse",

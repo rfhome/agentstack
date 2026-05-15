@@ -32,7 +32,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
   }
 
   // Send all agent responses to Nexus for synthesis
-  const client = new Anthropic();
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const start = Date.now();
   const nexusPrompt = JSON.stringify({ agentResponses, sessionContext: input.sessionData }, null, 2);
 

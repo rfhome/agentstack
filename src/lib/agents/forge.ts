@@ -15,7 +15,7 @@ const SYSTEM_PROMPT = `You are Forge, a strength program architect embedded in A
 }`;
 
 export async function runForge(input: AgentInput): Promise<AgentResponse> {
-  const client = new OpenAI();
+  const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const start = Date.now();
   const prompt = JSON.stringify(input, null, 2);
 
