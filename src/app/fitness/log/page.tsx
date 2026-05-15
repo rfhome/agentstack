@@ -13,6 +13,15 @@ type AnalysisResult = {
   recommendation: { content: string; nextActions: string[] };
   agentResponses: AgentResponse[];
 };
+type Prescription = {
+  cycleLabel: string;
+  focusStatement: string;
+  warmup: { name: string; detail: string }[];
+  exercises: { name: string; sets: number; reps: string; weights: string; focus: string }[];
+  finisher?: { label: string; items: string[] };
+  cardio?: { label: string; options: string[]; note: string };
+  todaysGoal: string;
+};
 
 const ANALYZING_STEPS = ["Pulse analyzing...", "Forge reviewing...", "Nexus synthesizing..."];
 
@@ -35,7 +44,7 @@ export default function LogSessionPage() {
   const [exercises, setExercises] = useState<Exercise[]>([emptyExercise()]);
 
   const [loadingWorkout, setLoadingWorkout] = useState(false);
-  const [workoutGuidance, setWorkoutGuidance] = useState("");
+  const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done">("idle");
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -47,24 +56,24 @@ export default function LogSessionPage() {
 
   async function handleGetWorkout() {
     setLoadingWorkout(true);
-    setWorkoutGuidance("");
+    setPrescription(null);
     try {
       const res = await fetch(`/api/prescribe?cycleDay=${cycleDay}`);
-      const data = await res.json();
+      const data: Prescription = await res.json();
       if (data.exercises?.length) {
         setExercises(
-          data.exercises.map((e: { name: string; sets?: number; reps?: string; weights?: string; notes?: string }) => ({
+          data.exercises.map((e) => ({
             name: e.name ?? "",
             sets: e.sets ? String(e.sets) : "",
             reps: e.reps ?? "",
             weights: e.weights ?? "",
-            notes: e.notes ?? "",
+            notes: e.focus ?? "",
           }))
         );
       }
-      if (data.guidance) setWorkoutGuidance(data.guidance);
+      setPrescription(data);
     } catch {
-      setWorkoutGuidance("Could not load workout — fill in manually.");
+      // silent — user can fill in manually
     } finally {
       setLoadingWorkout(false);
     }
@@ -272,6 +281,63 @@ export default function LogSessionPage() {
           </div>
         </div>
 
+        {/* Prescription panel */}
+        {prescription && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-4 text-sm">
+            <div>
+              <p className="text-xs font-medium text-amber-400 uppercase tracking-wide mb-1">{prescription.cycleLabel} Day</p>
+              <p className="text-zinc-300 leading-relaxed">{prescription.focusStatement}</p>
+            </div>
+
+            {prescription.warmup?.length > 0 && (
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Warm-up</p>
+                <ul className="space-y-1">
+                  {prescription.warmup.map((w, i) => (
+                    <li key={i} className="flex gap-2 text-zinc-400">
+                      <span className="text-zinc-600 shrink-0">·</span>
+                      <span><span className="text-zinc-300">{w.name}</span> — {w.detail}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {prescription.finisher && (
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">{prescription.finisher.label}</p>
+                <ul className="space-y-1">
+                  {prescription.finisher.items.map((item, i) => (
+                    <li key={i} className="text-zinc-400 flex gap-2">
+                      <span className="text-zinc-600 shrink-0">·</span>{item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {prescription.cardio && (
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">{prescription.cardio.label}</p>
+                <ul className="space-y-1">
+                  {prescription.cardio.options.map((opt, i) => (
+                    <li key={i} className="text-zinc-400 flex gap-2">
+                      <span className="text-zinc-600 shrink-0">·</span>{opt}
+                    </li>
+                  ))}
+                </ul>
+                {prescription.cardio.note && (
+                  <p className="text-xs text-zinc-500 mt-1 italic">{prescription.cardio.note}</p>
+                )}
+              </div>
+            )}
+
+            {prescription.todaysGoal && (
+              <p className="text-xs text-zinc-400 italic border-t border-zinc-800 pt-3">{prescription.todaysGoal}</p>
+            )}
+          </div>
+        )}
+
         {/* Exercises */}
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -285,9 +351,6 @@ export default function LogSessionPage() {
               )}
             </button>
           </div>
-          {workoutGuidance && (
-            <p className="text-xs text-zinc-400 italic mb-3 px-1">{workoutGuidance}</p>
-          )}
           <div className="space-y-2">
             {exercises.map((ex, i) => (
               <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2">
