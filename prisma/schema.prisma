@@ -17,6 +17,7 @@ model User {
   recommendations Recommendation[]
   agentLogs       AgentLog[]
   profile         UserProfile?
+  wearables       WearableConnection[]
   createdAt       DateTime         @default(now())
 }
 
@@ -107,6 +108,18 @@ model Goal {
   achieved        Boolean   @default(false)
   achievedAt      DateTime?
   createdAt       DateTime  @default(now())
+}
+
+model WearableConnection {
+  id          String   @id @default(cuid())
+  userId      String
+  provider    String   // "oura" | "fitbit"
+  accessToken String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, provider])
 }
 
 model UserProfile {

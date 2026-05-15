@@ -5,6 +5,7 @@ import Link from "next/link";
 import AuthProvider from "@/components/AuthProvider";
 import NavUser from "@/components/NavUser";
 
+
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -23,6 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </Link>
             <Link href="/fitness" className="text-sm text-zinc-400 hover:text-white transition-colors">
               Fitness
+            </Link>
+            <Link href="/settings" className="text-sm text-zinc-400 hover:text-white transition-colors">
+              Settings
             </Link>
             <NavUser />
           </nav>

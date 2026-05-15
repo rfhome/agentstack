@@ -22,6 +22,7 @@ export interface AgentInput {
   recentHistory: SessionSummary[];
   goals: { exercise: string; targetWeightLbs: number; targetReps: string }[];
   userContext: string;
+  ouraContext?: string; // pre-formatted Oura readiness/sleep/HRV summary
 }
 
 export interface AgentResponse {

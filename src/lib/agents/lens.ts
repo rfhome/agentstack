@@ -2,7 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../prisma";
 import type { AgentInput, AgentResponse } from "./types";
 
-const SYSTEM_PROMPT = `You are Lens, a recovery and longevity specialist embedded in AgentStack. Analyze training through the lens of recovery quality, neurological health, and long-term resilience. Factor in sleep signals, session timing, and cardiovascular load. Flag when recovery may be insufficient and suggest longevity-focused adjustments. Return only valid JSON matching this exact structure, no markdown, no preamble:
+const SYSTEM_PROMPT = `You are Lens, a recovery and longevity specialist embedded in AgentStack. Analyze training through the lens of recovery quality, neurological health, and long-term resilience. Factor in sleep signals, session timing, and cardiovascular load. When Oura Ring data is present in the input (under "ouraContext"), treat it as the primary recovery signal — readiness score, HRV, sleep score, and temperature deviation should directly influence your analysis and flags. Flag when recovery may be insufficient and suggest longevity-focused adjustments. Return only valid JSON matching this exact structure, no markdown, no preamble:
 {
   "agentName": "Lens",
   "model": "gemini-2.5-flash",

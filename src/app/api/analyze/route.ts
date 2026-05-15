@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
+import { fetchOuraData, formatOuraForLens } from "@/lib/oura";
 import type { AgentInput, SessionSummary } from "@/lib/agents/types";
 
 function toSessionSummary(s: {
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
     }
 
-    const [session, recentSessions, goals, userContext] = await Promise.all([
+    const [session, recentSessions, goals, userContext, ouraConn] = await Promise.all([
       prisma.session.findUnique({
         where: { id: sessionId, userId },
         include: { exercises: true },
@@ -61,10 +62,23 @@ export async function POST(req: NextRequest) {
       }),
       prisma.goal.findMany({ where: { userId, achieved: false } }),
       getUserContext(userId),
+      prisma.wearableConnection.findUnique({
+        where: { userId_provider: { userId, provider: "oura" } },
+      }),
     ]);
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    }
+
+    let ouraContext: string | undefined;
+    if (ouraConn) {
+      try {
+        const ouraData = await fetchOuraData(ouraConn.accessToken);
+        ouraContext = formatOuraForLens(ouraData);
+      } catch {
+        // Oura fetch failed — agents proceed without it
+      }
     }
 
     const input: AgentInput = {
@@ -78,6 +92,7 @@ export async function POST(req: NextRequest) {
         targetReps: g.targetReps ?? "",
       })),
       userContext,
+      ouraContext,
     };
 
     const result = await runOrchestrator(input);
