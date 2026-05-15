@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { getUserContext } from "@/lib/context/userProfile";
 import OpenAI from "openai";
 
@@ -41,17 +42,23 @@ const CYCLE_LABELS: Record<number, string> = { 1: "Push", 2: "Pull", 3: "Legs", 
 
 export async function GET(req: NextRequest) {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = session.user.id;
+
     const cycleDay = parseInt(req.nextUrl.searchParams.get("cycleDay") ?? "1");
 
     const [recentSessions, goals, userContext] = await Promise.all([
       prisma.session.findMany({
-        where: { cycleDay },
+        where: { userId, cycleDay },
         take: 3,
         orderBy: { date: "desc" },
         include: { exercises: true },
       }),
-      prisma.goal.findMany({ where: { achieved: false } }),
-      getUserContext(),
+      prisma.goal.findMany({ where: { userId, achieved: false } }),
+      getUserContext(userId),
     ]);
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

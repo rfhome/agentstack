@@ -1,9 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
+
+export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const sessions = await prisma.session.findMany({
+      where: { userId: session.user.id },
       take: 10,
       orderBy: { date: "desc" },
       include: { exercises: true },
@@ -17,6 +26,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
+    const authSession = await auth();
+    if (!authSession?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const { session, exercises } = body as {
       session: {
@@ -43,6 +57,7 @@ export async function POST(req: NextRequest) {
     const created = await prisma.session.create({
       data: {
         ...session,
+        userId: authSession.user.id,
         date: session.date ? new Date(session.date) : new Date(),
         exercises: {
           create: exercises ?? [],

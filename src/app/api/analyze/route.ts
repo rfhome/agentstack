@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
 import type { AgentInput, SessionSummary } from "@/lib/agents/types";
@@ -35,6 +36,12 @@ function toSessionSummary(s: {
 
 export async function POST(req: NextRequest) {
   try {
+    const authSession = await auth();
+    if (!authSession?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const userId = authSession.user.id;
+
     const { sessionId } = (await req.json()) as { sessionId: number };
 
     if (!sessionId) {
@@ -43,17 +50,17 @@ export async function POST(req: NextRequest) {
 
     const [session, recentSessions, goals, userContext] = await Promise.all([
       prisma.session.findUnique({
-        where: { id: sessionId },
+        where: { id: sessionId, userId },
         include: { exercises: true },
       }),
       prisma.session.findMany({
-        where: { id: { not: sessionId } },
+        where: { userId, id: { not: sessionId } },
         take: 4,
         orderBy: { date: "desc" },
         include: { exercises: true },
       }),
-      prisma.goal.findMany({ where: { achieved: false } }),
-      getUserContext(),
+      prisma.goal.findMany({ where: { userId, achieved: false } }),
+      getUserContext(userId),
     ]);
 
     if (!session) {
@@ -62,6 +69,7 @@ export async function POST(req: NextRequest) {
 
     const input: AgentInput = {
       sessionId,
+      userId,
       sessionData: toSessionSummary(session),
       recentHistory: recentSessions.map(toSessionSummary),
       goals: goals.map((g: { exercise: string; targetWeightLbs: number | null; targetReps: string | null }) => ({

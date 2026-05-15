@@ -63,6 +63,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
       response: text,
       latencyMs,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
     },
   });
 
@@ -72,6 +73,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
       content: synthesis.content,
       nextActions: synthesis.nextActions,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
     },
   });
 

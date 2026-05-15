@@ -57,6 +57,7 @@ export async function runForge(input: AgentInput): Promise<AgentResponse> {
       response: text,
       latencyMs,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
+      ...(input.userId ? { userId: input.userId } : {}),
     },
   });
 

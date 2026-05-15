@@ -17,6 +17,7 @@ export interface SessionSummary {
 
 export interface AgentInput {
   sessionId?: number;
+  userId?: string;
   sessionData: SessionSummary;
   recentHistory: SessionSummary[];
   goals: { exercise: string; targetWeightLbs: number; targetReps: string }[];

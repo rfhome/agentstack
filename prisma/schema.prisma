@@ -6,8 +6,42 @@ datasource db {
   provider = "postgresql"
 }
 
+model User {
+  id              String           @id @default(cuid())
+  name            String?
+  email           String           @unique
+  password        String?
+  accounts        Account[]
+  workouts        Session[]
+  goals           Goal[]
+  recommendations Recommendation[]
+  agentLogs       AgentLog[]
+  profile         UserProfile?
+  createdAt       DateTime         @default(now())
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
 model Session {
   id                Int              @id @default(autoincrement())
+  userId            String?
+  user              User?            @relation(fields: [userId], references: [id])
   date              DateTime         @default(now())
   cycleDay          Int?
   cycleNumber       Int?
@@ -37,6 +71,8 @@ model Exercise {
 
 model AgentLog {
   id        Int      @id @default(autoincrement())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
   session   Session? @relation(fields: [sessionId], references: [id])
   sessionId Int?
   agentName String
@@ -50,6 +86,8 @@ model AgentLog {
 
 model Recommendation {
   id          Int      @id @default(autoincrement())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
   session     Session? @relation(fields: [sessionId], references: [id])
   sessionId   Int?
   domain      String
@@ -60,6 +98,8 @@ model Recommendation {
 
 model Goal {
   id              Int       @id @default(autoincrement())
+  userId          String?
+  user            User?     @relation(fields: [userId], references: [id])
   exercise        String
   targetWeightLbs Float?
   targetReps      String?
@@ -70,7 +110,9 @@ model Goal {
 }
 
 model UserProfile {
-  id        Int      @id @default(1)
+  id        Int      @id @default(autoincrement())
+  userId    String?  @unique
+  user      User?    @relation(fields: [userId], references: [id])
   name      String   @default("Roberto")
   context   String
   updatedAt DateTime @updatedAt
