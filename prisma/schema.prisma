@@ -30,6 +30,7 @@ model Exercise {
   name      String
   sets      Int?
   reps      String?
+  weights   String?
   weightLbs Float?
   notes     String?
 }

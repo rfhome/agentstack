@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
         name: string;
         sets?: number;
         reps?: string;
+        weights?: string;
         weightLbs?: number;
         notes?: string;
       }[];

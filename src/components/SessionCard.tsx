@@ -3,6 +3,7 @@ type Exercise = {
   name: string;
   sets: number | null;
   reps: string | null;
+  weights?: string | null;
   weightLbs: number | null;
 };
 
@@ -60,7 +61,7 @@ export function SessionCard({ session }: { session: Session }) {
               <span className="text-zinc-300">{ex.name}</span>
               <span className="text-zinc-500 tabular-nums">
                 {ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : ""}
-                {ex.weightLbs ? ` @ ${ex.weightLbs}lbs` : ""}
+                {ex.weights ? ` @ ${ex.weights}lbs` : ex.weightLbs ? ` @ ${ex.weightLbs}lbs` : ""}
               </span>
             </div>
           ))}

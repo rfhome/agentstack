@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
 
-type Exercise = { name: string; sets: string; reps: string; weightLbs: string };
+type Exercise = { name: string; sets: string; reps: string; weights: string; notes: string };
 type AgentResponse = {
   agentName: string; analysis: string; recommendations: string[];
   flags: string[]; nextSession: string; latencyMs: number;
@@ -17,7 +17,7 @@ type AnalysisResult = {
 const ANALYZING_STEPS = ["Pulse analyzing...", "Forge reviewing...", "Nexus synthesizing..."];
 
 function emptyExercise(): Exercise {
-  return { name: "", sets: "", reps: "", weightLbs: "" };
+  return { name: "", sets: "", reps: "", weights: "", notes: "" };
 }
 
 export default function LogSessionPage() {
@@ -34,6 +34,8 @@ export default function LogSessionPage() {
   const [notes, setNotes] = useState("");
   const [exercises, setExercises] = useState<Exercise[]>([emptyExercise()]);
 
+  const [loadingWorkout, setLoadingWorkout] = useState(false);
+  const [workoutGuidance, setWorkoutGuidance] = useState("");
   const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done">("idle");
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -41,6 +43,31 @@ export default function LogSessionPage() {
 
   function updateExercise(i: number, field: keyof Exercise, value: string) {
     setExercises((prev) => prev.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex)));
+  }
+
+  async function handleGetWorkout() {
+    setLoadingWorkout(true);
+    setWorkoutGuidance("");
+    try {
+      const res = await fetch(`/api/prescribe?cycleDay=${cycleDay}`);
+      const data = await res.json();
+      if (data.exercises?.length) {
+        setExercises(
+          data.exercises.map((e: { name: string; sets?: number; reps?: string; weights?: string; notes?: string }) => ({
+            name: e.name ?? "",
+            sets: e.sets ? String(e.sets) : "",
+            reps: e.reps ?? "",
+            weights: e.weights ?? "",
+            notes: e.notes ?? "",
+          }))
+        );
+      }
+      if (data.guidance) setWorkoutGuidance(data.guidance);
+    } catch {
+      setWorkoutGuidance("Could not load workout — fill in manually.");
+    } finally {
+      setLoadingWorkout(false);
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -70,7 +97,8 @@ export default function LogSessionPage() {
               name: ex.name.trim(),
               sets: ex.sets ? parseInt(ex.sets) : undefined,
               reps: ex.reps || undefined,
-              weightLbs: ex.weightLbs ? parseFloat(ex.weightLbs) : undefined,
+              weights: ex.weights || undefined,
+              notes: ex.notes || undefined,
             })),
         }),
       });
@@ -246,7 +274,20 @@ export default function LogSessionPage() {
 
         {/* Exercises */}
         <div>
-          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Exercises</h2>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Exercises</h2>
+            <button type="button" onClick={handleGetWorkout} disabled={loadingWorkout}
+              className="flex items-center gap-1.5 rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50">
+              {loadingWorkout ? (
+                <><span className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" /> Loading...</>
+              ) : (
+                <><span>⚡</span> Get Workout</>
+              )}
+            </button>
+          </div>
+          {workoutGuidance && (
+            <p className="text-xs text-zinc-400 italic mb-3 px-1">{workoutGuidance}</p>
+          )}
           <div className="space-y-2">
             {exercises.map((ex, i) => (
               <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2">
@@ -264,12 +305,15 @@ export default function LogSessionPage() {
                     placeholder="Sets" type="number" min="1"
                     className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
                   <input value={ex.reps} onChange={(e) => updateExercise(i, "reps", e.target.value)}
-                    placeholder="Reps e.g. 8,8,6"
+                    placeholder="8,8,8,6"
                     className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
-                  <input value={ex.weightLbs} onChange={(e) => updateExercise(i, "weightLbs", e.target.value)}
-                    placeholder="lbs" type="number" min="0" step="2.5"
+                  <input value={ex.weights} onChange={(e) => updateExercise(i, "weights", e.target.value)}
+                    placeholder="45,45,50"
                     className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
                 </div>
+                {ex.notes && (
+                  <p className="text-xs text-zinc-500 italic px-0.5">{ex.notes}</p>
+                )}
               </div>
             ))}
           </div>
