@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
       sessionId,
       sessionData: toSessionSummary(session),
       recentHistory: recentSessions.map(toSessionSummary),
-      goals: goals.map((g) => ({
+      goals: goals.map((g: { exercise: string; targetWeightLbs: number | null; targetReps: string | null }) => ({
         exercise: g.exercise,
         targetWeightLbs: g.targetWeightLbs ?? 0,
         targetReps: g.targetReps ?? "",
