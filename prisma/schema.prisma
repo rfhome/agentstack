@@ -111,13 +111,15 @@ model Goal {
 }
 
 model WearableConnection {
-  id          String   @id @default(cuid())
-  userId      String
-  provider    String   // "oura" | "fitbit"
-  accessToken String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String    @id @default(cuid())
+  userId       String
+  provider     String    // "oura" | "fitbit"
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([userId, provider])
 }

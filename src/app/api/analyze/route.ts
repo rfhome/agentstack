@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       getUserContext(userId),
       prisma.wearableConnection.findUnique({
         where: { userId_provider: { userId, provider: "oura" } },
+        select: { id: true },
       }),
     ]);
 
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
     let ouraContext: string | undefined;
     if (ouraConn) {
       try {
-        const ouraData = await fetchOuraData(ouraConn.accessToken);
+        const ouraData = await fetchOuraData(userId);
         ouraContext = formatOuraForLens(ouraData);
       } catch {
         // Oura fetch failed — agents proceed without it

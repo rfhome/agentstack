@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 interface OuraStatus {
   connected: boolean;
@@ -11,11 +13,10 @@ interface OuraStatus {
   error?: string;
 }
 
-export default function SettingsPage() {
+function SettingsContent() {
+  const searchParams = useSearchParams();
   const [ouraStatus, setOuraStatus] = useState<OuraStatus | null>(null);
-  const [token, setToken] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const oauthError = searchParams.get("error");
 
   useEffect(() => {
     fetch("/api/wearables/oura")
@@ -23,31 +24,16 @@ export default function SettingsPage() {
       .then(setOuraStatus);
   }, []);
 
-  async function connectOura(e: React.FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setMessage("");
-    const res = await fetch("/api/wearables/oura", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    });
-    const data = await res.json();
-    if (res.ok) {
-      setMessage("Connected successfully.");
-      setToken("");
-      setOuraStatus(await fetch("/api/wearables/oura").then((r) => r.json()));
-    } else {
-      setMessage(data.error ?? "Connection failed.");
-    }
-    setSaving(false);
-  }
-
   async function disconnectOura() {
     await fetch("/api/wearables/oura", { method: "DELETE" });
     setOuraStatus({ connected: false });
-    setMessage("");
   }
+
+  const scoreColor = (score: number | null) =>
+    score == null ? "text-zinc-400"
+    : score >= 70 ? "text-emerald-400"
+    : score >= 50 ? "text-amber-400"
+    : "text-red-400";
 
   return (
     <div className="space-y-8">
@@ -64,12 +50,16 @@ export default function SettingsPage() {
           )}
         </div>
 
+        {oauthError && (
+          <p className="text-sm text-red-400">Connection failed — please try again.</p>
+        )}
+
         {ouraStatus?.connected && ouraStatus.data && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-2 text-sm">
             {ouraStatus.data.readiness && (
               <div className="flex items-center justify-between">
                 <span className="text-zinc-400">Readiness</span>
-                <span className={`font-medium ${(ouraStatus.data.readiness.score ?? 0) >= 70 ? "text-emerald-400" : (ouraStatus.data.readiness.score ?? 0) >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                <span className={`font-medium ${scoreColor(ouraStatus.data.readiness.score)}`}>
                   {ouraStatus.data.readiness.score ?? "—"}/100
                 </span>
               </div>
@@ -78,7 +68,7 @@ export default function SettingsPage() {
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400">Sleep score</span>
-                  <span className={`font-medium ${(ouraStatus.data.sleep.score ?? 0) >= 70 ? "text-emerald-400" : (ouraStatus.data.sleep.score ?? 0) >= 50 ? "text-amber-400" : "text-red-400"}`}>
+                  <span className={`font-medium ${scoreColor(ouraStatus.data.sleep.score)}`}>
                     {ouraStatus.data.sleep.score ?? "—"}/100
                   </span>
                 </div>
@@ -89,9 +79,13 @@ export default function SettingsPage() {
               </>
             )}
             {ouraStatus.error && (
-              <p className="text-amber-400 text-xs">{ouraStatus.error}</p>
+              <p className="text-amber-400 text-xs mt-1">{ouraStatus.error}</p>
             )}
           </div>
+        )}
+
+        {ouraStatus === null && (
+          <div className="text-sm text-zinc-500">Loading...</div>
         )}
 
         {ouraStatus?.connected ? (
@@ -102,35 +96,27 @@ export default function SettingsPage() {
             Disconnect Oura
           </button>
         ) : (
-          <form onSubmit={connectOura} className="space-y-3">
+          <div className="space-y-2">
             <p className="text-sm text-zinc-400">
-              Enter your Oura Personal Access Token. Generate one at{" "}
-              <span className="text-zinc-300">cloud.ouraring.com → Personal Access Tokens</span>.
+              Connect your Oura Ring to give Lens real-time recovery data — readiness score, HRV, and sleep quality — before every analysis.
             </p>
-            <input
-              type="password"
-              value={token}
-              onChange={(e) => setToken(e.target.value)}
-              placeholder="Oura Personal Access Token"
-              required
-              className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
-            />
-            <button
-              type="submit"
-              disabled={saving}
-              className="bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+            <a
+              href="/api/wearables/oura/authorize"
+              className="inline-block bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
             >
-              {saving ? "Connecting..." : "Connect Oura"}
-            </button>
-          </form>
-        )}
-
-        {message && (
-          <p className={`text-sm ${message.includes("success") ? "text-emerald-400" : "text-red-400"}`}>
-            {message}
-          </p>
+              Connect Oura Ring
+            </a>
+          </div>
         )}
       </section>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<div className="text-zinc-500 text-sm">Loading...</div>}>
+      <SettingsContent />
+    </Suspense>
   );
 }
