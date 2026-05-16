@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function GET() {
     }
 
     const userId = session.user.id;
-    const profile = await prisma.userProfile.findFirst({ where: { userId } });
+    const profile = await withRLS(userId, (db) => db.userProfile.findFirst({ where: { userId } }));
 
     return NextResponse.json({
       name: profile?.name ?? "",
@@ -34,12 +34,14 @@ export async function PUT(req: NextRequest) {
     const userId = session.user.id;
     const { name, context } = (await req.json()) as { name: string; context: string };
 
-    const existing = await prisma.userProfile.findFirst({ where: { userId } });
-    if (existing) {
-      await prisma.userProfile.update({ where: { id: existing.id }, data: { name, context } });
-    } else {
-      await prisma.userProfile.create({ data: { userId, name, context } });
-    }
+    await withRLS(userId, async (db) => {
+      const existing = await db.userProfile.findFirst({ where: { userId } });
+      if (existing) {
+        await db.userProfile.update({ where: { id: existing.id }, data: { name, context } });
+      } else {
+        await db.userProfile.create({ data: { userId, name, context } });
+      }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { fetchFitbitData } from "@/lib/fitbit";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +10,9 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const conn = await prisma.wearableConnection.findUnique({
+  const conn = await withRLS(session.user.id, (db) => db.wearableConnection.findUnique({
     where: { userId_provider: { userId: session.user.id, provider: "fitbit" } },
-  });
+  }));
 
   if (!conn) return NextResponse.json({ connected: false });
 
@@ -29,9 +29,9 @@ export async function DELETE() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  await prisma.wearableConnection.deleteMany({
+  await withRLS(session.user.id, (db) => db.wearableConnection.deleteMany({
     where: { userId: session.user.id, provider: "fitbit" },
-  });
+  }));
 
   return NextResponse.json({ connected: false });
 }

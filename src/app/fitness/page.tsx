@@ -2,29 +2,39 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { Suspense } from "react";
-import { prisma } from "@/lib/prisma";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { withRLS } from "@/lib/prisma-rls";
 import { SessionCard } from "@/components/SessionCard";
 import { RecommendationFeed } from "@/components/RecommendationFeed";
 import { GoalTracker } from "@/components/GoalTracker";
 import { WeeklySummary } from "@/components/WeeklySummary";
 
 export default async function FitnessPage() {
-  const [sessions, recommendations, goals] = await Promise.all([
-    prisma.session.findMany({
-      take: 10,
-      orderBy: { date: "desc" },
-      include: {
-        exercises: true,
-        recommendations: { select: { id: true }, take: 1 },
-      },
-    }),
-    prisma.recommendation.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: { session: { select: { cycleDay: true, rating: true } } },
-    }),
-    prisma.goal.findMany({ where: { achieved: false } }),
-  ]);
+  const session = await auth();
+  if (!session?.user?.id) redirect("/auth/signin");
+  const userId = session.user.id;
+
+  const [sessions, recommendations, goals] = await withRLS(userId, (db) =>
+    Promise.all([
+      db.session.findMany({
+        where: { userId },
+        take: 10,
+        orderBy: { date: "desc" },
+        include: {
+          exercises: true,
+          recommendations: { select: { id: true }, take: 1 },
+        },
+      }),
+      db.recommendation.findMany({
+        where: { userId },
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: { session: { select: { cycleDay: true, rating: true } } },
+      }),
+      db.goal.findMany({ where: { userId, achieved: false } }),
+    ])
+  );
 
   return (
     <div className="space-y-8">

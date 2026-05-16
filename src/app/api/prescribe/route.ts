@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { getUserContext } from "@/lib/context/userProfile";
 import OpenAI from "openai";
@@ -50,16 +50,18 @@ export async function GET(req: NextRequest) {
 
     const cycleDay = parseInt(req.nextUrl.searchParams.get("cycleDay") ?? "1");
 
-    const [recentSessions, goals, userContext] = await Promise.all([
-      prisma.session.findMany({
-        where: { userId, cycleDay },
-        take: 3,
-        orderBy: { date: "desc" },
-        include: { exercises: true },
-      }),
-      prisma.goal.findMany({ where: { userId, achieved: false } }),
-      getUserContext(userId),
-    ]);
+    const [recentSessions, goals, userContext] = await withRLS(userId, (db) =>
+      Promise.all([
+        db.session.findMany({
+          where: { userId, cycleDay },
+          take: 3,
+          orderBy: { date: "desc" },
+          include: { exercises: true },
+        }),
+        db.goal.findMany({ where: { userId, achieved: false } }),
+        getUserContext(userId, db),
+      ])
+    );
 
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 
 const OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token";
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
 
   const expiresAt = new Date(Date.now() + tokens.expires_in * 1000);
 
-  await prisma.wearableConnection.upsert({
+  await withRLS(session.user.id, (db) => db.wearableConnection.upsert({
     where: { userId_provider: { userId: session.user.id, provider: "oura" } },
     create: {
       userId: session.user.id,
@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
       refreshToken: tokens.refresh_token,
       expiresAt,
     },
-  });
+  }));
 
   return NextResponse.redirect(settingsUrl);
 }

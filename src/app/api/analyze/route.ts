@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
@@ -60,28 +60,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
     }
 
-    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn] = await Promise.all([
-      prisma.session.findUnique({
-        where: { id: sessionId, userId },
-        include: { exercises: true, cardioActivities: true },
-      }),
-      prisma.session.findMany({
-        where: { userId, id: { not: sessionId } },
-        take: 4,
-        orderBy: { date: "desc" },
-        include: { exercises: true, cardioActivities: true },
-      }),
-      prisma.goal.findMany({ where: { userId, achieved: false } }),
-      getUserContext(userId),
-      prisma.wearableConnection.findUnique({
-        where: { userId_provider: { userId, provider: "oura" } },
-        select: { id: true },
-      }),
-      prisma.wearableConnection.findUnique({
-        where: { userId_provider: { userId, provider: "fitbit" } },
-        select: { id: true },
-      }),
-    ]);
+    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn] = await withRLS(userId, (db) =>
+      Promise.all([
+        db.session.findUnique({
+          where: { id: sessionId, userId },
+          include: { exercises: true, cardioActivities: true },
+        }),
+        db.session.findMany({
+          where: { userId, id: { not: sessionId } },
+          take: 4,
+          orderBy: { date: "desc" },
+          include: { exercises: true, cardioActivities: true },
+        }),
+        db.goal.findMany({ where: { userId, achieved: false } }),
+        getUserContext(userId, db),
+        db.wearableConnection.findUnique({
+          where: { userId_provider: { userId, provider: "oura" } },
+          select: { id: true },
+        }),
+        db.wearableConnection.findUnique({
+          where: { userId_provider: { userId, provider: "fitbit" } },
+          select: { id: true },
+        }),
+      ])
+    );
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });

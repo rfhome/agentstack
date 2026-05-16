@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { SessionHistoryCard } from "@/components/SessionHistoryCard";
 
 const AGENT_NAMES = ["Pulse", "Forge", "Lens"];
@@ -10,9 +10,10 @@ const AGENT_NAMES = ["Pulse", "Forge", "Lens"];
 export default async function SessionsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/signin");
+  const userId = session.user.id;
 
-  const sessions = await prisma.session.findMany({
-    where: { userId: session.user.id },
+  const sessions = await withRLS(userId, (db) => db.session.findMany({
+    where: { userId },
     orderBy: { date: "desc" },
     include: {
       exercises: true,
@@ -32,7 +33,7 @@ export default async function SessionsPage() {
         },
       },
     },
-  });
+  }));
 
   const serialized = sessions.map((s) => {
     const seenAgents = new Set<string>();

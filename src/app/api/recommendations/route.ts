@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const recommendations = await prisma.recommendation.findMany({
+    const recommendations = await withRLS(session.user.id, (db) => db.recommendation.findMany({
       where: { userId: session.user.id },
       take: 5,
       orderBy: { createdAt: "desc" },
@@ -20,7 +20,7 @@ export async function GET() {
           select: { id: true, date: true, cycleDay: true, rating: true },
         },
       },
-    });
+    }));
     return NextResponse.json(recommendations);
   } catch (err) {
     console.error("[GET /api/recommendations]", err);

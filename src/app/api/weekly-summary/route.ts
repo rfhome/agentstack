@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { fetchOuraData, formatOuraForLens } from "@/lib/oura";
 import { getUserContext } from "@/lib/context/userProfile";
@@ -27,10 +27,10 @@ export async function GET() {
     }
     const userId = authSession.user.id;
 
-    const latest = await prisma.recommendation.findFirst({
+    const latest = await withRLS(userId, (db) => db.recommendation.findFirst({
       where: { userId, domain: "weekly" },
       orderBy: { createdAt: "desc" },
-    });
+    }));
 
     return NextResponse.json({ summary: latest ?? null });
   } catch (err) {
@@ -51,23 +51,25 @@ export async function POST() {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
-    const [sessions, prevSessions, ouraConn, userContext] = await Promise.all([
-      prisma.session.findMany({
-        where: { userId, date: { gte: sevenDaysAgo } },
-        orderBy: { date: "desc" },
-        include: { exercises: true, cardioActivities: true },
-      }),
-      prisma.session.findMany({
-        where: { userId, date: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
-        orderBy: { date: "desc" },
-        include: { exercises: true },
-      }),
-      prisma.wearableConnection.findUnique({
-        where: { userId_provider: { userId, provider: "oura" } },
-        select: { id: true },
-      }),
-      getUserContext(userId),
-    ]);
+    const [sessions, prevSessions, ouraConn, userContext] = await withRLS(userId, (db) =>
+      Promise.all([
+        db.session.findMany({
+          where: { userId, date: { gte: sevenDaysAgo } },
+          orderBy: { date: "desc" },
+          include: { exercises: true, cardioActivities: true },
+        }),
+        db.session.findMany({
+          where: { userId, date: { gte: fourteenDaysAgo, lt: sevenDaysAgo } },
+          orderBy: { date: "desc" },
+          include: { exercises: true },
+        }),
+        db.wearableConnection.findUnique({
+          where: { userId_provider: { userId, provider: "oura" } },
+          select: { id: true },
+        }),
+        getUserContext(userId, db),
+      ])
+    );
 
     let ouraContext: string | undefined;
     if (ouraConn) {
@@ -122,14 +124,14 @@ export async function POST() {
       };
     }
 
-    await prisma.recommendation.create({
+    await withRLS(userId, (db) => db.recommendation.create({
       data: {
         userId,
         domain: "weekly",
         content: synthesis.content,
         nextActions: synthesis.nextActions,
       },
-    });
+    }));
 
     return NextResponse.json(synthesis);
   } catch (err) {

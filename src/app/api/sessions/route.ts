@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
@@ -11,12 +12,12 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const sessions = await prisma.session.findMany({
+    const sessions = await withRLS(session.user.id, (db) => db.session.findMany({
       where: { userId: session.user.id },
       take: 10,
       orderBy: { date: "desc" },
       include: { exercises: true },
-    });
+    }));
     return NextResponse.json(sessions);
   } catch (err) {
     console.error("[GET /api/sessions]", err);
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
       }[];
     };
 
-    const created = await prisma.session.create({
+    const created = await withRLS(authSession.user.id, (db) => db.session.create({
       data: {
         ...session,
         userId: authSession.user.id,
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
         },
       },
       include: { exercises: true, cardioActivities: true },
-    });
+    }));
 
     return NextResponse.json({ sessionId: created.id, session: created }, { status: 201 });
   } catch (err) {

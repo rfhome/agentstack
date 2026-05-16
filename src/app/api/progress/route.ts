@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 
 export const dynamic = "force-dynamic";
@@ -18,11 +18,11 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const exercises = await prisma.exercise.findMany({
+  const exercises = await withRLS(session.user.id, (db) => db.exercise.findMany({
     where: { session: { userId: session.user.id } },
     include: { session: { select: { date: true } } },
     orderBy: { session: { date: "asc" } },
-  });
+  }));
 
   const grouped = new Map<string, { displayName: string; dataPoints: { date: string; maxWeight: number | null; totalSets: number | null }[] }>();
 

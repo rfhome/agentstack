@@ -9,7 +9,8 @@
     "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "db:rls": "psql $DATABASE_URL -f prisma/rls.sql"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
