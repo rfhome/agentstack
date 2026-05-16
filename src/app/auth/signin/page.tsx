@@ -27,7 +27,7 @@ export default function SignInPage() {
       setError("Invalid email or password.");
       setLoading(false);
     } else {
-      router.push("/");
+      router.push("/fitness");
     }
   }
 
@@ -83,7 +83,7 @@ export default function SignInPage() {
 
         <button
           type="button"
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => signIn("google", { callbackUrl: "/fitness" })}
           className="w-full flex items-center justify-center gap-2 bg-zinc-900 border border-zinc-700 text-white rounded-lg py-2 text-sm font-medium hover:bg-zinc-800 transition-colors"
         >
           <svg viewBox="0 0 24 24" className="w-4 h-4" xmlns="http://www.w3.org/2000/svg">
