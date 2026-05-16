@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "db:rls": "psql $DATABASE_URL -f prisma/rls.sql"
+    "db:rls": "node prisma/apply-rls.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",

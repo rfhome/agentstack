@@ -15,7 +15,7 @@ export default async function FitnessPage() {
   if (!session?.user?.id) redirect("/auth/signin");
   const userId = session.user.id;
 
-  const [sessions, recommendations, goals] = await withRLS(userId, (db) =>
+  const [sessions, recommendations, goals, profile] = await withRLS(userId, (db) =>
     Promise.all([
       db.session.findMany({
         where: { userId },
@@ -33,6 +33,7 @@ export default async function FitnessPage() {
         include: { session: { select: { cycleDay: true, rating: true } } },
       }),
       db.goal.findMany({ where: { userId, achieved: false } }),
+      db.userProfile.findFirst({ where: { userId } }),
     ])
   );
 
@@ -47,6 +48,18 @@ export default async function FitnessPage() {
           Log Session
         </Link>
       </div>
+
+      {!profile?.context && (
+        <div className="rounded-xl border border-violet-800 bg-violet-900/20 p-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-violet-300">Build your training profile</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Answer 9 quick questions so your agents know your goals, program, and equipment.</p>
+          </div>
+          <Link href="/onboarding" className="shrink-0 ml-4 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-sm px-4 py-2 font-medium transition-colors">
+            Get started →
+          </Link>
+        </div>
+      )}
 
       <section>
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">This Week</h2>

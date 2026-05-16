@@ -1,0 +1,337 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+
+type StepType = "single" | "multi" | "text";
+
+interface StepOption {
+  id: string;
+  label: string;
+  sub?: string;
+}
+
+interface Step {
+  id: string;
+  type: StepType;
+  question: string;
+  subtext?: string;
+  placeholder?: string;
+  options?: StepOption[];
+}
+
+const STEPS: Step[] = [
+  {
+    id: "primaryGoal",
+    type: "single",
+    question: "What's your primary training goal?",
+    options: [
+      { id: "longevity", label: "Longevity & healthy aging", sub: "Stay strong, mobile, and cognitively healthy long-term" },
+      { id: "strength", label: "Build strength & muscle", sub: "Progressive overload and hypertrophy" },
+      { id: "weight", label: "Lose weight & improve body composition", sub: "Burn fat while preserving muscle" },
+      { id: "endurance", label: "Improve cardiovascular fitness", sub: "Aerobic capacity and endurance base" },
+      { id: "general", label: "General fitness & energy", sub: "Feel better, move well, stay consistent" },
+    ],
+  },
+  {
+    id: "secondaryGoals",
+    type: "multi",
+    question: "What else matters to you?",
+    subtext: "Select all that apply",
+    options: [
+      { id: "brain", label: "Brain & cognitive health" },
+      { id: "injury", label: "Injury prevention & joint health" },
+      { id: "aesthetics", label: "Aesthetics & body composition" },
+      { id: "cardio_fitness", label: "Cardiovascular conditioning" },
+      { id: "functional", label: "Functional strength for daily life" },
+      { id: "performance", label: "Athletic performance" },
+    ],
+  },
+  {
+    id: "experience",
+    type: "single",
+    question: "How long have you been training consistently?",
+    options: [
+      { id: "beginner", label: "Just getting started" },
+      { id: "1-2y", label: "1–2 years" },
+      { id: "3-5y", label: "3–5 years" },
+      { id: "5plus", label: "5+ years" },
+    ],
+  },
+  {
+    id: "split",
+    type: "single",
+    question: "What training split do you follow?",
+    options: [
+      { id: "ppla", label: "Push / Pull / Legs / Arms", sub: "4-day cycle" },
+      { id: "ppl", label: "Push / Pull / Legs", sub: "3-day cycle" },
+      { id: "ul", label: "Upper / Lower", sub: "2–4 days per week" },
+      { id: "fullbody", label: "Full body", sub: "2–3 days per week" },
+      { id: "unsure", label: "Not sure yet", sub: "I'll follow recommendations" },
+    ],
+  },
+  {
+    id: "equipment",
+    type: "single",
+    question: "Where do you train?",
+    options: [
+      { id: "limited", label: "Commercial gym (machines, cables, Smith, dumbbells)", sub: "e.g. Planet Fitness style" },
+      { id: "full", label: "Full commercial gym", sub: "Includes Olympic barbells and power racks" },
+      { id: "home", label: "Home gym", sub: "Some equipment available" },
+      { id: "minimal", label: "Bodyweight / minimal equipment" },
+    ],
+  },
+  {
+    id: "cardio",
+    type: "multi",
+    question: "What cardio do you include?",
+    subtext: "Select all that apply",
+    options: [
+      { id: "bike", label: "Stationary bike" },
+      { id: "treadmill", label: "Treadmill" },
+      { id: "rower", label: "Rowing machine" },
+      { id: "elliptical", label: "Elliptical" },
+      { id: "outdoor", label: "Outdoor running or cycling" },
+      { id: "none", label: "No cardio" },
+    ],
+  },
+  {
+    id: "wearables",
+    type: "multi",
+    question: "Do you use any fitness wearables?",
+    subtext: "Select all that apply",
+    options: [
+      { id: "oura", label: "Oura Ring" },
+      { id: "fitbit", label: "Fitbit / Google Fit" },
+      { id: "apple", label: "Apple Watch" },
+      { id: "garmin", label: "Garmin" },
+      { id: "none", label: "None" },
+    ],
+  },
+  {
+    id: "injuries",
+    type: "text",
+    question: "Any injuries or physical limitations we should know about?",
+    subtext: "Optional — keeps your program safe",
+    placeholder: "e.g. Lower back sensitivity, shoulder impingement, knee issues...",
+  },
+  {
+    id: "otherActivities",
+    type: "text",
+    question: "Any other sports or physical activities you do regularly?",
+    subtext: "Optional — helps account for overall fatigue",
+    placeholder: "e.g. Tennis, pickleball, golf, cycling, hiking...",
+  },
+];
+
+interface OnboardingWizardProps {
+  hasProfile: boolean;
+}
+
+export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
+  const router = useRouter();
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState("");
+
+  const currentStep = STEPS[step];
+
+  function canAdvance(): boolean {
+    if (currentStep.type === "single") {
+      const val = answers[currentStep.id];
+      return typeof val === "string" && val.length > 0;
+    }
+    // multi and text are always advanceable
+    return true;
+  }
+
+  function handleSingleSelect(optionId: string) {
+    setAnswers((prev) => ({ ...prev, [currentStep.id]: optionId }));
+  }
+
+  function handleMultiToggle(optionId: string) {
+    const current = (answers[currentStep.id] as string[] | undefined) ?? [];
+    const updated = current.includes(optionId)
+      ? current.filter((id) => id !== optionId)
+      : [...current, optionId];
+    setAnswers((prev) => ({ ...prev, [currentStep.id]: updated }));
+  }
+
+  function handleTextChange(value: string) {
+    setAnswers((prev) => ({ ...prev, [currentStep.id]: value }));
+  }
+
+  function handleNext() {
+    if (step < STEPS.length - 1) {
+      setStep((s) => s + 1);
+    } else {
+      handleFinish();
+    }
+  }
+
+  function handleBack() {
+    if (step > 0) setStep((s) => s - 1);
+  }
+
+  async function handleFinish() {
+    setGenerating(true);
+    setError("");
+    try {
+      const res = await fetch("/api/profile/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(answers),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { error?: string }).error ?? "Generation failed");
+      }
+      router.push("/fitness");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setGenerating(false);
+    }
+  }
+
+  if (generating) {
+    return (
+      <div className="max-w-lg mx-auto py-12 px-4 flex flex-col items-center justify-center min-h-[400px]">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 flex flex-col items-center gap-4 w-full">
+          <div className="w-8 h-8 border-2 border-zinc-600 border-t-violet-400 rounded-full animate-spin" />
+          <p className="text-zinc-400 text-sm">Nexus is building your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const selectedSingle = typeof answers[currentStep.id] === "string"
+    ? (answers[currentStep.id] as string)
+    : "";
+  const selectedMulti = Array.isArray(answers[currentStep.id])
+    ? (answers[currentStep.id] as string[])
+    : [];
+  const textValue = typeof answers[currentStep.id] === "string"
+    ? (answers[currentStep.id] as string)
+    : "";
+
+  return (
+    <div className="max-w-lg mx-auto py-12 px-4">
+      <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 space-y-6">
+        {/* Progress dots */}
+        <div className="flex items-center gap-1.5 justify-center">
+          {STEPS.map((_, i) => (
+            <div
+              key={i}
+              className={`h-1.5 rounded-full transition-all ${
+                i <= step
+                  ? "w-6 bg-violet-500"
+                  : "w-1.5 bg-zinc-700"
+              }`}
+            />
+          ))}
+        </div>
+
+        {/* Heading */}
+        <div>
+          <h1 className="text-lg font-semibold text-white">
+            {hasProfile ? "Update your training profile" : "Let's build your training profile"}
+          </h1>
+          <p className="mt-2 text-base text-zinc-200 font-medium">{currentStep.question}</p>
+          {currentStep.subtext && (
+            <p className="mt-0.5 text-sm text-zinc-400">{currentStep.subtext}</p>
+          )}
+        </div>
+
+        {/* Answer area */}
+        <div>
+          {currentStep.type === "single" && currentStep.options && (
+            <div className="grid grid-cols-1 gap-2">
+              {currentStep.options.map((opt) => {
+                const isSelected = selectedSingle === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleSingleSelect(opt.id)}
+                    className={`rounded-xl border p-4 cursor-pointer text-left transition-colors ${
+                      isSelected
+                        ? "border-violet-500 bg-violet-900/20 text-white"
+                        : "border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-600"
+                    }`}
+                  >
+                    <span className="font-medium text-sm">{opt.label}</span>
+                    {opt.sub && (
+                      <p className="text-xs text-zinc-400 mt-0.5">{opt.sub}</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {currentStep.type === "multi" && currentStep.options && (
+            <div className="grid grid-cols-1 gap-2">
+              {currentStep.options.map((opt) => {
+                const isSelected = selectedMulti.includes(opt.id);
+                return (
+                  <button
+                    key={opt.id}
+                    onClick={() => handleMultiToggle(opt.id)}
+                    className={`relative rounded-xl border p-4 cursor-pointer text-left transition-colors ${
+                      isSelected
+                        ? "border-violet-500 bg-violet-900/20 text-white"
+                        : "border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-600"
+                    }`}
+                  >
+                    {isSelected && (
+                      <span className="absolute top-2.5 right-3 text-violet-400 text-xs font-bold">✓</span>
+                    )}
+                    <span className="font-medium text-sm pr-5">{opt.label}</span>
+                    {opt.sub && (
+                      <p className="text-xs text-zinc-400 mt-0.5">{opt.sub}</p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {currentStep.type === "text" && (
+            <textarea
+              value={textValue}
+              onChange={(e) => handleTextChange(e.target.value)}
+              placeholder={currentStep.placeholder}
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-800 text-zinc-200 p-3 text-sm resize-none h-24 focus:outline-none focus:border-zinc-500 placeholder:text-zinc-600"
+            />
+          )}
+        </div>
+
+        {/* Error */}
+        {error && (
+          <p className="text-sm text-red-400">{error}</p>
+        )}
+
+        {/* Navigation */}
+        <div className="flex items-center justify-between pt-2">
+          {step > 0 ? (
+            <button
+              onClick={handleBack}
+              className="text-zinc-500 hover:text-white text-sm transition-colors"
+            >
+              Back
+            </button>
+          ) : (
+            <div />
+          )}
+          <button
+            onClick={handleNext}
+            disabled={!canAdvance()}
+            className="rounded-lg bg-white text-zinc-950 px-6 py-2 text-sm font-semibold hover:bg-zinc-200 disabled:opacity-40 transition-colors"
+          >
+            {step === STEPS.length - 1 ? "Generate my profile →" : "Next →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
