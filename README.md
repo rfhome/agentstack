@@ -1,36 +1,121 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AgentStack
 
-## Getting Started
+A personal multi-agent AI system. Currently focused on fitness — session logging, wearable integration, and analysis by a coordinated team of specialized AI agents.
 
-First, run the development server:
+Live: [agentstack.catalystedgeconnect.com](https://agentstack.catalystedgeconnect.com)
+
+---
+
+## What it does
+
+You log a training session. Three AI agents analyze it in parallel:
+
+- **Pulse** (Claude Sonnet) — precision fitness analyst: progressive overload tracking, per-exercise breakdown, HR zone classification, trend detection
+- **Forge** (GPT-4o) — strength program architect: prescribes exact weights/sets/reps for your next session based on logged history and your defined program
+- **Lens** (Gemini 2.5 Flash) — recovery and longevity specialist: uses Oura Ring readiness/HRV/sleep and Fitbit/Google Fit HR zones to assess whether you should push, back off, or rest
+
+**Nexus** (Claude Sonnet) receives all three reports and synthesizes a single prioritized recommendation with concrete next actions.
+
+The system gets sharper over time as session history accumulates. All agents receive your full training profile (goals, program structure, health history, current progressions) on every analysis.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js (App Router, TypeScript) |
+| Styling | Tailwind CSS |
+| Database | PostgreSQL (Railway) via Prisma 7 + PrismaPg adapter |
+| Auth | NextAuth v5 — email/password + Google OAuth |
+| AI | Anthropic Claude, OpenAI GPT-4o, Google Gemini |
+| Wearables | Oura Ring OAuth 2.0, Fitbit via Google Fit API |
+| Deployment | Railway |
+
+---
+
+## Local setup
+
+**Prerequisites:** Node 20+, a PostgreSQL database, API keys for Anthropic, OpenAI, and Google Gemini.
+
+```bash
+git clone https://github.com/rfhome/agentstack
+cd agentstack
+npm install
+```
+
+Create `.env.local`:
+
+```env
+DATABASE_URL="postgresql://..."
+AUTH_SECRET="..."                  # generate with: openssl rand -base64 32
+
+# AI providers
+ANTHROPIC_API_KEY="sk-ant-..."
+OPENAI_API_KEY="sk-proj-..."
+GEMINI_API_KEY="AIza..."
+
+# Auth
+AUTH_URL="http://localhost:3000"
+
+# Wearables (optional)
+OURA_CLIENT_ID="..."
+OURA_CLIENT_SECRET="..."
+FITBIT_CLIENT_ID="..."             # Google OAuth client ID (Fitbit migrated to Google Health API)
+FITBIT_CLIENT_SECRET="..."
+
+# Google Sign-In (can reuse FITBIT_CLIENT_ID/SECRET if same Google Cloud project)
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+```
+
+Apply the database schema:
+
+```bash
+npx prisma db push
+```
+
+Run the dev server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Key routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Route | Description |
+|-------|-------------|
+| `/fitness` | Dashboard — recent sessions, recommendations, goals |
+| `/fitness/log` | Log a session with exercises, HR data, rating |
+| `/fitness/sessions` | Full session history — expandable cards with Nexus synthesis and per-agent breakdown |
+| `/fitness/progress` | Progress charts — max weight per exercise over time |
+| `/settings` | Connect/disconnect Oura Ring and Fitbit |
+| `/profile` | Edit training context (the markdown document all agents read) |
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## Architecture
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+POST /api/analyze
+  └─ Promise.allSettled([runPulse, runForge, runLens])
+       ├─ Pulse  → Claude Sonnet — fitness analysis JSON
+       ├─ Forge  → GPT-4o        — prescription JSON
+       └─ Lens   → Gemini Flash  — recovery analysis JSON
+  └─ runNexus(agentResponses + sessionContext)
+       └─ Claude Sonnet — synthesized recommendation + nextActions
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Agent inputs include: session data, last 4 sessions, active goals, user profile context, Oura data (if connected), Fitbit/Google Fit data (if connected).
 
-## Deploy on Vercel
+All agent responses and Nexus synthesis are stored in `AgentLog` and `Recommendation` tables, linked to the session.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Wearable integration notes
+
+**Oura Ring** — connects via OAuth 2.0 at dev.ouraring.com. Provides readiness score, HRV balance, sleep score, temperature deviation, deep/REM sleep duration. Injected into Lens and Pulse context on every analysis.
+
+**Fitbit / Google Fit** — Fitbit's legacy developer portal closed new app registrations in 2026; integration now uses Google OAuth + Google Fit REST API. Provides avg/max heart rate, active minutes, heart points (AZM equivalent), steps. Requires Google Cloud project with Fitness API enabled.

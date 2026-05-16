@@ -16,6 +16,7 @@ export default async function SessionsPage() {
     orderBy: { date: "desc" },
     include: {
       exercises: true,
+      cardioActivities: true,
       recommendations: {
         orderBy: { createdAt: "desc" },
         take: 1,
@@ -57,6 +58,16 @@ export default async function SessionsPage() {
         reps: ex.reps,
         weights: ex.weights,
         weightLbs: ex.weightLbs,
+      })),
+      cardioActivities: s.cardioActivities.map((c) => ({
+        id: c.id,
+        tag: c.tag,
+        machine: c.machine,
+        durationMin: c.durationMin,
+        distanceMi: c.distanceMi,
+        calories: c.calories,
+        avgHR: c.avgHR,
+        maxHR: c.maxHR,
       })),
       recommendation: s.recommendations[0]
         ? {

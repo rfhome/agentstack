@@ -17,6 +17,7 @@ function toSessionSummary(s: {
   rating: string | null;
   notes: string | null;
   exercises: { name: string; sets: number | null; reps: string | null; weightLbs: number | null; weights: string | null }[];
+  cardioActivities: { tag: string; machine: string; durationMin: number | null; distanceMi: number | null; calories: number | null; avgHR: number | null }[];
 }): SessionSummary {
   return {
     date: s.date.toISOString().split("T")[0],
@@ -33,6 +34,14 @@ function toSessionSummary(s: {
       reps: e.reps ?? "",
       weightLbs: e.weightLbs ?? 0,
       weights: e.weights ?? undefined,
+    })),
+    cardioActivities: s.cardioActivities.map((c) => ({
+      tag: c.tag,
+      machine: c.machine,
+      durationMin: c.durationMin,
+      distanceMi: c.distanceMi,
+      calories: c.calories,
+      avgHR: c.avgHR,
     })),
   };
 }
@@ -54,13 +63,13 @@ export async function POST(req: NextRequest) {
     const [session, recentSessions, goals, userContext, ouraConn, fitbitConn] = await Promise.all([
       prisma.session.findUnique({
         where: { id: sessionId, userId },
-        include: { exercises: true },
+        include: { exercises: true, cardioActivities: true },
       }),
       prisma.session.findMany({
         where: { userId, id: { not: sessionId } },
         take: 4,
         orderBy: { date: "desc" },
-        include: { exercises: true },
+        include: { exercises: true, cardioActivities: true },
       }),
       prisma.goal.findMany({ where: { userId, achieved: false } }),
       getUserContext(userId),

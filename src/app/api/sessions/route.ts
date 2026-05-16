@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { session, exercises } = body as {
+    const { session, exercises, cardioActivities } = body as {
       session: {
         date?: string;
         cycleDay?: number;
@@ -52,6 +52,16 @@ export async function POST(req: NextRequest) {
         weightLbs?: number;
         notes?: string;
       }[];
+      cardioActivities?: {
+        tag: string;
+        machine: string;
+        durationMin?: number;
+        distanceMi?: number;
+        calories?: number;
+        avgHR?: number;
+        maxHR?: number;
+        notes?: string;
+      }[];
     };
 
     const created = await prisma.session.create({
@@ -62,8 +72,11 @@ export async function POST(req: NextRequest) {
         exercises: {
           create: exercises ?? [],
         },
+        cardioActivities: {
+          create: (cardioActivities ?? []).map(c => ({ ...c, userId: authSession.user.id })),
+        },
       },
-      include: { exercises: true },
+      include: { exercises: true, cardioActivities: true },
     });
 
     return NextResponse.json({ sessionId: created.id, session: created }, { status: 201 });

@@ -22,6 +22,17 @@ type Recommendation = {
   nextActions: string[];
 };
 
+type CardioActivity = {
+  id: number;
+  tag: string;
+  machine: string;
+  durationMin: number | null;
+  distanceMi: number | null;
+  calories: number | null;
+  avgHR: number | null;
+  maxHR: number | null;
+};
+
 type Session = {
   id: number;
   date: string;
@@ -32,6 +43,7 @@ type Session = {
   rating: string | null;
   notes: string | null;
   exercises: Exercise[];
+  cardioActivities?: CardioActivity[];
   recommendation: Recommendation | null;
   agentLogs: AgentLog[];
 };
@@ -161,6 +173,23 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                       : ex.weightLbs
                       ? ` @ ${ex.weightLbs}lbs`
                       : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {session.cardioActivities && session.cardioActivities.length > 0 && (
+            <div className="space-y-1">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Cardio</p>
+              {session.cardioActivities.map((c) => (
+                <div key={c.id} className="flex justify-between text-sm">
+                  <span className="text-zinc-300 capitalize">{c.machine} <span className="text-zinc-500 normal-case">({c.tag})</span></span>
+                  <span className="text-zinc-500 tabular-nums">
+                    {c.durationMin ? `${c.durationMin}min` : ""}
+                    {c.distanceMi ? ` · ${c.distanceMi}mi` : ""}
+                    {c.avgHR ? ` · ${c.avgHR}bpm` : ""}
+                    {c.calories ? ` · ${c.calories}cal` : ""}
                   </span>
                 </div>
               ))}

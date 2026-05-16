@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
 
 type Exercise = { name: string; sets: string; reps: string; weights: string; notes: string };
+type CardioEntry = {
+  tag: "warmup" | "finisher" | "standalone" | "";
+  machine: "treadmill" | "bike" | "rower" | "elliptical" | "";
+  durationMin: string;
+  distanceMi: string;
+  calories: string;
+  avgHR: string;
+  maxHR: string;
+  analyzing: boolean;
+  analyzed: boolean;
+};
 type CheckItem = { label: string; done: boolean };
 type AgentResponse = {
   agentName: string; analysis: string; recommendations: string[];
@@ -45,6 +56,7 @@ export default function LogSessionPage() {
   const [exercises, setExercises] = useState<Exercise[]>([emptyExercise()]);
   const [warmupItems, setWarmupItems] = useState<CheckItem[]>([]);
   const [finisherItems, setFinisherItems] = useState<CheckItem[]>([]);
+  const [cardioEntries, setCardioEntries] = useState<CardioEntry[]>([]);
 
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
@@ -116,6 +128,17 @@ export default function LogSessionPage() {
             reps: ex.reps || undefined,
             weights: ex.weights || undefined,
             notes: ex.notes || undefined,
+          })),
+        cardioActivities: cardioEntries
+          .filter(c => c.tag && c.machine)
+          .map(c => ({
+            tag: c.tag,
+            machine: c.machine,
+            durationMin: c.durationMin ? parseInt(c.durationMin) : undefined,
+            distanceMi: c.distanceMi ? parseFloat(c.distanceMi) : undefined,
+            calories: c.calories ? parseInt(c.calories) : undefined,
+            avgHR: c.avgHR ? parseInt(c.avgHR) : undefined,
+            maxHR: c.maxHR ? parseInt(c.maxHR) : undefined,
           })),
       }),
     });
@@ -409,6 +432,224 @@ export default function LogSessionPage() {
             className="mt-2 w-full rounded-lg border border-dashed border-zinc-700 py-2 text-sm text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors">
             + Add Exercise
           </button>
+        </div>
+
+        {/* Cardio activities */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Cardio</h2>
+            <button
+              type="button"
+              onClick={() =>
+                setCardioEntries((prev) => [
+                  ...prev,
+                  { tag: "", machine: "", durationMin: "", distanceMi: "", calories: "", avgHR: "", maxHR: "", analyzing: false, analyzed: false },
+                ])
+              }
+              className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors"
+            >
+              + Add
+            </button>
+          </div>
+          <div className="space-y-3">
+            {cardioEntries.map((entry, i) => {
+              function updateCardio<K extends keyof CardioEntry>(field: K, value: CardioEntry[K]) {
+                setCardioEntries((prev) => prev.map((c, idx) => (idx === i ? { ...c, [field]: value } : c)));
+              }
+              function removeCardio() {
+                setCardioEntries((prev) => prev.filter((_, idx) => idx !== i));
+              }
+              async function handleCardioPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                updateCardio("analyzing", true);
+                try {
+                  const reader = new FileReader();
+                  const base64 = await new Promise<string>((resolve, reject) => {
+                    reader.onload = () => resolve((reader.result as string).split(",")[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                  });
+                  const res = await fetch("/api/analyze/cardio-photo", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ imageBase64: base64, mimeType: file.type, machine: entry.machine, tag: entry.tag }),
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    setCardioEntries((prev) =>
+                      prev.map((c, idx) =>
+                        idx === i
+                          ? {
+                              ...c,
+                              durationMin: data.durationMin != null ? String(data.durationMin) : c.durationMin,
+                              distanceMi: data.distanceMi != null ? String(data.distanceMi) : c.distanceMi,
+                              calories: data.calories != null ? String(data.calories) : c.calories,
+                              avgHR: data.avgHR != null ? String(data.avgHR) : c.avgHR,
+                              maxHR: data.maxHR != null ? String(data.maxHR) : c.maxHR,
+                              analyzing: false,
+                              analyzed: true,
+                            }
+                          : c
+                      )
+                    );
+                  } else {
+                    updateCardio("analyzing", false);
+                  }
+                } catch {
+                  updateCardio("analyzing", false);
+                }
+              }
+
+              const tagOptions: { value: CardioEntry["tag"]; label: string }[] = [
+                { value: "warmup", label: "Warmup" },
+                { value: "finisher", label: "Finisher" },
+                { value: "standalone", label: "Standalone" },
+              ];
+              const machineOptions: { value: CardioEntry["machine"]; label: string }[] = [
+                { value: "treadmill", label: "Treadmill" },
+                { value: "bike", label: "Bike" },
+                { value: "rower", label: "Rower" },
+                { value: "elliptical", label: "Elliptical" },
+              ];
+
+              return (
+                <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-3">
+                  {/* Tag chips */}
+                  <div className="flex flex-wrap gap-2">
+                    {tagOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateCardio("tag", entry.tag === opt.value ? "" : opt.value)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                          entry.tag === opt.value
+                            ? "bg-blue-600 text-white"
+                            : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Machine chips */}
+                  <div className="flex flex-wrap gap-2">
+                    {machineOptions.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => updateCardio("machine", entry.machine === opt.value ? "" : opt.value)}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                          entry.machine === opt.value
+                            ? "bg-zinc-700 text-white"
+                            : "bg-zinc-800 text-zinc-400 hover:text-zinc-200"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Photo upload — only when both tag and machine selected */}
+                  {entry.tag && entry.machine && (
+                    <div>
+                      <label className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors">
+                        {entry.analyzing ? (
+                          <>
+                            <span className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" />
+                            Analyzing...
+                          </>
+                        ) : (
+                          <>
+                            {entry.analyzed ? "Re-analyze screen photo" : "Analyze screen photo"}
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={entry.analyzing}
+                          onChange={handleCardioPhoto}
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Metric fields */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Duration (min)</label>
+                      <input
+                        type="number"
+                        value={entry.durationMin}
+                        onChange={(e) => updateCardio("durationMin", e.target.value)}
+                        placeholder="20"
+                        min="0"
+                        className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Distance (mi)</label>
+                      <input
+                        type="number"
+                        value={entry.distanceMi}
+                        onChange={(e) => updateCardio("distanceMi", e.target.value)}
+                        placeholder="1.5"
+                        min="0"
+                        step="0.01"
+                        className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Calories</label>
+                      <input
+                        type="number"
+                        value={entry.calories}
+                        onChange={(e) => updateCardio("calories", e.target.value)}
+                        placeholder="180"
+                        min="0"
+                        className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Avg HR</label>
+                      <input
+                        type="number"
+                        value={entry.avgHR}
+                        onChange={(e) => updateCardio("avgHR", e.target.value)}
+                        placeholder="138"
+                        min="0"
+                        className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-zinc-500 mb-1">Max HR</label>
+                      <input
+                        type="number"
+                        value={entry.maxHR}
+                        onChange={(e) => updateCardio("maxHR", e.target.value)}
+                        placeholder="162"
+                        min="0"
+                        className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Remove button */}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={removeCardio}
+                      className="text-zinc-600 hover:text-red-400 text-xs transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* Finisher checklist */}

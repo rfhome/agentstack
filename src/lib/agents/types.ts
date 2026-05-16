@@ -14,6 +14,14 @@ export interface SessionSummary {
     weightLbs: number;
     weights?: string;
   }[];
+  cardioActivities?: {
+    tag: string;
+    machine: string;
+    durationMin: number | null;
+    distanceMi: number | null;
+    calories: number | null;
+    avgHR: number | null;
+  }[];
 }
 
 export interface AgentInput {
