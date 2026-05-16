@@ -12,6 +12,7 @@ export async function withRLS<T>(
   userId: string,
   fn: (db: RLSClient) => Promise<T>
 ): Promise<T> {
+  if (!userId) throw new Error("withRLS called without userId — refusing to query without user isolation");
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.current_user_id', ${userId}, TRUE)`;
     return fn(tx);
