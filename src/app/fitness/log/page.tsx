@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
 
@@ -36,6 +36,24 @@ type Prescription = {
 };
 
 const ANALYZING_STEPS = ["Pulse analyzing...", "Forge reviewing...", "Nexus synthesizing..."];
+const DRAFT_KEY = "log-draft";
+
+type Draft = {
+  savedAt: string;
+  date: string;
+  cycleDay: string;
+  cycleNumber: string;
+  duration: string;
+  avgHR: string;
+  cardioLoad: string;
+  azm: string;
+  rating: string;
+  notes: string;
+  exercises: Exercise[];
+  warmupItems: CheckItem[];
+  finisherItems: CheckItem[];
+  cardioEntries: CardioEntry[];
+};
 
 function emptyExercise(): Exercise {
   return { name: "", sets: "", reps: "", weights: "", notes: "" };
@@ -58,6 +76,9 @@ export default function LogSessionPage() {
   const [finisherItems, setFinisherItems] = useState<CheckItem[]>([]);
   const [cardioEntries, setCardioEntries] = useState<CardioEntry[]>([]);
 
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [showDraftBanner, setShowDraftBanner] = useState(false);
+
   const [fillingFitbit, setFillingFitbit] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
@@ -65,6 +86,60 @@ export default function LogSessionPage() {
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
+
+  // Load draft on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DRAFT_KEY);
+      if (!saved) return;
+      const parsed = JSON.parse(saved) as Draft;
+      const hasContent = parsed.exercises?.some((e) => e.name) || parsed.notes || parsed.cardioEntries?.length > 0;
+      if (hasContent) {
+        setDraft(parsed);
+        setShowDraftBanner(true);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Auto-save draft (debounced 500ms), only while form is active
+  useEffect(() => {
+    if (step !== "idle") return;
+    const timer = setTimeout(() => {
+      try {
+        const draftData: Draft = {
+          savedAt: new Date().toISOString(),
+          date, cycleDay, cycleNumber, duration, avgHR, cardioLoad, azm, rating, notes,
+          exercises, warmupItems, finisherItems, cardioEntries,
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      } catch { /* localStorage full or unavailable */ }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [step, date, cycleDay, cycleNumber, duration, avgHR, cardioLoad, azm, rating, notes, exercises, warmupItems, finisherItems, cardioEntries]);
+
+  function restoreDraft() {
+    if (!draft) return;
+    setDate(draft.date);
+    setCycleDay(draft.cycleDay);
+    setCycleNumber(draft.cycleNumber);
+    setDuration(draft.duration);
+    setAvgHR(draft.avgHR);
+    setCardioLoad(draft.cardioLoad);
+    setAzm(draft.azm);
+    setRating(draft.rating);
+    setNotes(draft.notes);
+    setExercises(draft.exercises.length ? draft.exercises : [emptyExercise()]);
+    setWarmupItems(draft.warmupItems);
+    setFinisherItems(draft.finisherItems);
+    setCardioEntries(draft.cardioEntries.map((c) => ({ ...c, analyzing: false })));
+    setShowDraftBanner(false);
+  }
+
+  function discardDraft() {
+    localStorage.removeItem(DRAFT_KEY);
+    setDraft(null);
+    setShowDraftBanner(false);
+  }
 
   function updateExercise(i: number, field: keyof Exercise, value: string) {
     setExercises((prev) => prev.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex)));
@@ -170,6 +245,7 @@ export default function LogSessionPage() {
     setStep("saving");
     try {
       await saveSession();
+      localStorage.removeItem(DRAFT_KEY);
       router.push("/fitness");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -182,6 +258,7 @@ export default function LogSessionPage() {
     setStep("saving");
     try {
       const sessionId = await saveSession();
+      localStorage.removeItem(DRAFT_KEY);
       setStep("analyzing");
 
       const interval = setInterval(() => {
@@ -267,6 +344,26 @@ export default function LogSessionPage() {
       <h1 className="text-2xl font-bold text-white">Log Session</h1>
 
       <div className="space-y-6">
+        {/* Draft restore banner */}
+        {showDraftBanner && draft && (
+          <div className="rounded-xl border border-amber-800 bg-amber-900/20 p-3 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-amber-300">Unsaved draft found</p>
+              <p className="text-xs text-zinc-400 mt-0.5">
+                {new Date(draft.savedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={discardDraft} className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                Discard
+              </button>
+              <button onClick={restoreDraft} className="text-xs rounded-lg bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 font-medium transition-colors">
+                Restore
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Session metadata */}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
