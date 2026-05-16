@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-const FITBIT_TOKEN_URL = "https://api.fitbit.com/oauth2/token";
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export async function GET(req: NextRequest) {
   const base = process.env.AUTH_URL ?? "http://localhost:3000";
@@ -14,31 +14,24 @@ export async function GET(req: NextRequest) {
 
   if (!code) return NextResponse.redirect(errorUrl);
 
-  // Get the authenticated user
   const session = await auth();
   if (!session?.user?.id) return NextResponse.redirect(`${base}/auth/signin`);
 
-  // Verify state matches the current user (CSRF check without cookie dependency)
   const expectedState = Buffer.from(session.user.id).toString("base64url");
   if (state !== expectedState) return NextResponse.redirect(errorUrl);
 
   const redirectUri = `${base}/api/wearables/fitbit/callback`;
 
-  const credentials = Buffer.from(
-    `${process.env.FITBIT_CLIENT_ID!}:${process.env.FITBIT_CLIENT_SECRET!}`
-  ).toString("base64");
-
-  // Exchange code for tokens using Basic auth (Fitbit requires this)
-  const tokenRes = await fetch(FITBIT_TOKEN_URL, {
+  // Google token exchange — client credentials in body (not Basic auth)
+  const tokenRes = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      Authorization: `Basic ${credentials}`,
-    },
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "authorization_code",
       code,
       redirect_uri: redirectUri,
+      client_id: process.env.FITBIT_CLIENT_ID!,
+      client_secret: process.env.FITBIT_CLIENT_SECRET!,
     }),
   });
 
@@ -66,7 +59,7 @@ export async function GET(req: NextRequest) {
     },
     update: {
       accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
+      refreshToken: tokens.refresh_token ?? undefined,
       expiresAt,
     },
   });
