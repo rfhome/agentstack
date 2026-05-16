@@ -49,9 +49,14 @@ export default async function FitnessPage() {
       <section>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Recent Sessions</h2>
-          <Link href="/fitness/sessions" className="text-xs text-zinc-400 hover:text-white transition-colors">
-            View all →
-          </Link>
+          <div className="flex items-center gap-4">
+            <Link href="/fitness/progress" className="text-xs text-zinc-400 hover:text-white transition-colors">
+              Progress →
+            </Link>
+            <Link href="/fitness/sessions" className="text-xs text-zinc-400 hover:text-white transition-colors">
+              View all →
+            </Link>
+          </div>
         </div>
         {sessions.length === 0 ? (
           <p className="text-zinc-500 text-sm">No sessions yet.</p>

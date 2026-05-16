@@ -31,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/settings" className="text-sm text-zinc-400 hover:text-white transition-colors">
               Settings
             </Link>
+            <Link href="/profile" className="text-sm text-zinc-400 hover:text-white transition-colors">
+              Profile
+            </Link>
             <NavUser />
           </nav>
           <main className="max-w-2xl mx-auto px-4 py-6">{children}</main>

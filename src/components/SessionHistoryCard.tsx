@@ -71,10 +71,41 @@ function parseAgentResponse(text: string): ParsedAgent {
 export function SessionHistoryCard({ session }: { session: Session }) {
   const [expanded, setExpanded] = useState(false);
   const [openAgent, setOpenAgent] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<{ recommendation: Recommendation; agentLogs: AgentLog[] } | null>(null);
+  const [analyzeError, setAnalyzeError] = useState("");
+
+  async function handleAnalyze() {
+    setAnalyzing(true);
+    setAnalyzeError("");
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId: session.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Analysis failed");
+      setAnalysisResult({
+        recommendation: data.recommendation,
+        agentLogs: data.agentResponses.map((r: { agentName: string; analysis: string; recommendations: string[]; latencyMs: number }, i: number) => ({
+          id: i,
+          agentName: r.agentName,
+          response: JSON.stringify(r),
+        })),
+      });
+    } catch (err) {
+      setAnalyzeError(err instanceof Error ? err.message : "Analysis failed");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   const date = new Date(session.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const cycleLabel = session.cycleDay ? CYCLE_LABELS[session.cycleDay] ?? `Day ${session.cycleDay}` : "Session";
-  const analyzed = session.agentLogs.length > 0 || session.recommendation !== null;
+  const analyzed = session.agentLogs.length > 0 || session.recommendation !== null || analysisResult !== null;
+  const displayRecommendation = analysisResult?.recommendation ?? session.recommendation;
+  const displayAgentLogs = analysisResult?.agentLogs ?? session.agentLogs;
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900">
@@ -136,7 +167,26 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             </div>
           )}
 
-          {session.recommendation && (
+          {!analyzed && !analyzing && (
+            <div>
+              {analyzeError && <p className="text-red-400 text-xs mb-2">{analyzeError}</p>}
+              <button
+                onClick={handleAnalyze}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white text-sm py-2 transition-colors"
+              >
+                Run Analysis
+              </button>
+            </div>
+          )}
+
+          {analyzing && (
+            <div className="flex items-center gap-3 py-2">
+              <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+              <span className="text-zinc-400 text-sm">Agents analyzing...</span>
+            </div>
+          )}
+
+          {displayRecommendation && (
             <div className="rounded-xl bg-zinc-800 p-4 space-y-3">
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-white" />
@@ -144,10 +194,10 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                   Nexus
                 </span>
               </div>
-              <p className="text-zinc-200 text-sm leading-relaxed">{session.recommendation.content}</p>
-              {session.recommendation.nextActions.length > 0 && (
+              <p className="text-zinc-200 text-sm leading-relaxed">{displayRecommendation.content}</p>
+              {displayRecommendation.nextActions.length > 0 && (
                 <ol className="space-y-2">
-                  {session.recommendation.nextActions.map((action, i) => (
+                  {displayRecommendation.nextActions.map((action, i) => (
                     <li key={i} className="flex gap-3 text-sm">
                       <span className="shrink-0 w-5 h-5 rounded-full bg-zinc-700 text-zinc-400 text-xs flex items-center justify-center font-medium">
                         {i + 1}
@@ -160,9 +210,9 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             </div>
           )}
 
-          {session.agentLogs.length > 0 && (
+          {displayAgentLogs.length > 0 && (
             <div className="space-y-2">
-              {session.agentLogs.map((log) => {
+              {displayAgentLogs.map((log) => {
                 const style = AGENT_STYLES[log.agentName] ?? AGENT_STYLES.Pulse;
                 const parsed = parseAgentResponse(log.response);
                 const isOpen = openAgent === `${session.id}-${log.agentName}`;
