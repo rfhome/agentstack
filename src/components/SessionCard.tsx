@@ -17,6 +17,7 @@ type Session = {
   rating: string | null;
   notes: string | null;
   exercises: Exercise[];
+  analyzed?: boolean;
 };
 
 const CYCLE_LABELS: Record<number, string> = { 1: "Push", 2: "Pull", 3: "Legs", 4: "Arms" };
@@ -40,7 +41,12 @@ export function SessionCard({ session }: { session: Session }) {
             {session.cycleNumber ? <span className="text-zinc-400 font-normal"> · Cycle {session.cycleNumber}</span> : null}
           </h3>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {session.analyzed != null && (
+            <span className={`text-xs px-2 py-0.5 rounded-full ${session.analyzed ? "bg-violet-900/40 text-violet-400" : "bg-zinc-800 text-zinc-500"}`}>
+              {session.analyzed ? "Analyzed" : "Not analyzed"}
+            </span>
+          )}
           {session.rating && (
             <span className={`text-xl font-bold ${RATING_COLOR[session.rating] ?? "text-zinc-400"}`}>
               {session.rating}

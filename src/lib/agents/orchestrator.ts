@@ -45,7 +45,9 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
 
   const latencyMs = Date.now() - start;
   const text = (msg.content[0] as { type: string; text: string }).text;
-  const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+  const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  const objectMatch = text.match(/(\{[\s\S]*\})/);
+  const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
 
   let synthesis: { content: string; nextActions: string[] };
   try {

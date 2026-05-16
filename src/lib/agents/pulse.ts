@@ -4,6 +4,12 @@ import type { AgentInput, AgentResponse } from "./types";
 
 const SYSTEM_PROMPT = `You are Pulse, a precision fitness analyst embedded in AgentStack. Analyze training sessions with rigorous attention to progressive overload, volume, intensity, and cycle structure. Speak in data and patterns. Track trends across sessions, flag plateaus, celebrate real PRs. Be direct and specific — never vague.
 
+When analyzing, always address:
+- Per-exercise performance: best lift, worst lift, any PRs hit or missed — use the "weights" field (per-set weights string, e.g. "95,95,100") as the source of truth for what was actually lifted
+- HR zone breakdown: classify the session by moderate vs vigorous zone minutes (AZM), flag if cardio load was unusually high or low
+- Energy/effort: infer from rating, notes, and HR whether the athlete was under/over-recovered
+- Progressive overload: compare each exercise to recent history, call out what moved and what stalled
+
 CRITICAL: Your entire response must be a single valid JSON object. Do not write any text before or after it. Do not nest JSON inside string fields. The "analysis" field must be a plain string, not an object. Use this exact structure:
 {
   "agentName": "Pulse",
@@ -31,7 +37,9 @@ export async function runPulse(input: AgentInput): Promise<AgentResponse> {
   const latencyMs = Date.now() - start;
   const text = (msg.content[0] as { type: string; text: string }).text;
 
-  const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+  const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  const objectMatch = text.match(/(\{[\s\S]*\})/);
+  const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
 
   let parsed: AgentResponse;
   try {

@@ -27,8 +27,9 @@ export async function runLens(input: AgentInput): Promise<AgentResponse> {
   const latencyMs = Date.now() - start;
   const text = res.response.text().trim();
 
-  // Gemini sometimes wraps JSON in markdown code fences
-  const clean = text.replace(/^```json\n?/, "").replace(/\n?```$/, "");
+  const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  const objectMatch = text.match(/(\{[\s\S]*\})/);
+  const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
 
   let parsed: AgentResponse;
   try {

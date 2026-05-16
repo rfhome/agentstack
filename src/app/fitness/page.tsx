@@ -11,7 +11,10 @@ export default async function FitnessPage() {
     prisma.session.findMany({
       take: 10,
       orderBy: { date: "desc" },
-      include: { exercises: true },
+      include: {
+        exercises: true,
+        recommendations: { select: { id: true }, take: 1 },
+      },
     }),
     prisma.recommendation.findMany({
       take: 5,
@@ -52,7 +55,7 @@ export default async function FitnessPage() {
             {sessions.map((s) => (
               <SessionCard
                 key={s.id}
-                session={{ ...s, date: s.date.toISOString() }}
+                session={{ ...s, date: s.date.toISOString(), analyzed: s.recommendations.length > 0 }}
               />
             ))}
           </div>

@@ -12,6 +12,7 @@ export interface SessionSummary {
     sets: number;
     reps: string;
     weightLbs: number;
+    weights?: string;
   }[];
 }
 

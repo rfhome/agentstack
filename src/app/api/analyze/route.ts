@@ -15,7 +15,7 @@ function toSessionSummary(s: {
   activeZoneMinutes: number | null;
   rating: string | null;
   notes: string | null;
-  exercises: { name: string; sets: number | null; reps: string | null; weightLbs: number | null }[];
+  exercises: { name: string; sets: number | null; reps: string | null; weightLbs: number | null; weights: string | null }[];
 }): SessionSummary {
   return {
     date: s.date.toISOString().split("T")[0],
@@ -31,6 +31,7 @@ function toSessionSummary(s: {
       sets: e.sets ?? 0,
       reps: e.reps ?? "",
       weightLbs: e.weightLbs ?? 0,
+      weights: e.weights ?? undefined,
     })),
   };
 }

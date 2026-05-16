@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
 
 type Exercise = { name: string; sets: string; reps: string; weights: string; notes: string };
+type CheckItem = { label: string; done: boolean };
 type AgentResponse = {
   agentName: string; analysis: string; recommendations: string[];
   flags: string[]; nextSession: string; latencyMs: number;
@@ -42,6 +43,8 @@ export default function LogSessionPage() {
   const [rating, setRating] = useState("");
   const [notes, setNotes] = useState("");
   const [exercises, setExercises] = useState<Exercise[]>([emptyExercise()]);
+  const [warmupItems, setWarmupItems] = useState<CheckItem[]>([]);
+  const [finisherItems, setFinisherItems] = useState<CheckItem[]>([]);
 
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
@@ -52,6 +55,10 @@ export default function LogSessionPage() {
 
   function updateExercise(i: number, field: keyof Exercise, value: string) {
     setExercises((prev) => prev.map((ex, idx) => (idx === i ? { ...ex, [field]: value } : ex)));
+  }
+
+  function deleteExercise(i: number) {
+    setExercises((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   async function handleGetWorkout() {
@@ -71,6 +78,12 @@ export default function LogSessionPage() {
           }))
         );
       }
+      if (data.warmup?.length) {
+        setWarmupItems(data.warmup.map((w) => ({ label: `${w.name} — ${w.detail}`, done: false })));
+      }
+      if (data.finisher?.items?.length) {
+        setFinisherItems(data.finisher.items.map((item) => ({ label: item, done: false })));
+      }
       setPrescription(data);
     } catch {
       // silent — user can fill in manually
@@ -79,43 +92,57 @@ export default function LogSessionPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function saveSession(): Promise<number> {
+    const sessionRes = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session: {
+          date,
+          cycleDay: cycleDay ? parseInt(cycleDay) : undefined,
+          cycleNumber: cycleNumber ? parseInt(cycleNumber) : undefined,
+          durationMinutes: duration ? parseInt(duration) : undefined,
+          avgHeartRate: avgHR ? parseInt(avgHR) : undefined,
+          cardioLoad: cardioLoad ? parseInt(cardioLoad) : undefined,
+          activeZoneMinutes: azm ? parseInt(azm) : undefined,
+          rating: rating || undefined,
+          notes: notes || undefined,
+        },
+        exercises: exercises
+          .filter((ex) => ex.name.trim())
+          .map((ex) => ({
+            name: ex.name.trim(),
+            sets: ex.sets ? parseInt(ex.sets) : undefined,
+            reps: ex.reps || undefined,
+            weights: ex.weights || undefined,
+            notes: ex.notes || undefined,
+          })),
+      }),
+    });
+    if (!sessionRes.ok) throw new Error("Failed to save session");
+    const { sessionId } = await sessionRes.json();
+    return sessionId as number;
+  }
+
+  async function handleSaveOnly() {
     setError("");
     setStep("saving");
-
     try {
-      const sessionRes = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          session: {
-            date,
-            cycleDay: cycleDay ? parseInt(cycleDay) : undefined,
-            cycleNumber: cycleNumber ? parseInt(cycleNumber) : undefined,
-            durationMinutes: duration ? parseInt(duration) : undefined,
-            avgHeartRate: avgHR ? parseInt(avgHR) : undefined,
-            cardioLoad: cardioLoad ? parseInt(cardioLoad) : undefined,
-            activeZoneMinutes: azm ? parseInt(azm) : undefined,
-            rating: rating || undefined,
-            notes: notes || undefined,
-          },
-          exercises: exercises
-            .filter((ex) => ex.name.trim())
-            .map((ex) => ({
-              name: ex.name.trim(),
-              sets: ex.sets ? parseInt(ex.sets) : undefined,
-              reps: ex.reps || undefined,
-              weights: ex.weights || undefined,
-              notes: ex.notes || undefined,
-            })),
-        }),
-      });
+      await saveSession();
+      router.push("/fitness");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setStep("idle");
+    }
+  }
 
-      const { sessionId } = await sessionRes.json();
+  async function handleSaveAndAnalyze() {
+    setError("");
+    setStep("saving");
+    try {
+      const sessionId = await saveSession();
       setStep("analyzing");
 
-      // Cycle through agent status messages while waiting
       const interval = setInterval(() => {
         setAnalyzeStep((s) => (s + 1) % ANALYZING_STEPS.length);
       }, 3000);
@@ -128,7 +155,6 @@ export default function LogSessionPage() {
 
       clearInterval(interval);
       const data = await analyzeRes.json();
-
       if (!analyzeRes.ok) throw new Error(data.error ?? "Analysis failed");
 
       setResult(data);
@@ -199,7 +225,7 @@ export default function LogSessionPage() {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">Log Session</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Session metadata */}
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
@@ -283,58 +309,36 @@ export default function LogSessionPage() {
 
         {/* Prescription panel */}
         {prescription && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-4 text-sm">
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3 text-sm">
             <div>
               <p className="text-xs font-medium text-amber-400 uppercase tracking-wide mb-1">{prescription.cycleLabel} Day</p>
               <p className="text-zinc-300 leading-relaxed">{prescription.focusStatement}</p>
             </div>
-
-            {prescription.warmup?.length > 0 && (
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Warm-up</p>
-                <ul className="space-y-1">
-                  {prescription.warmup.map((w, i) => (
-                    <li key={i} className="flex gap-2 text-zinc-400">
-                      <span className="text-zinc-600 shrink-0">·</span>
-                      <span><span className="text-zinc-300">{w.name}</span> — {w.detail}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {prescription.finisher && (
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">{prescription.finisher.label}</p>
-                <ul className="space-y-1">
-                  {prescription.finisher.items.map((item, i) => (
-                    <li key={i} className="text-zinc-400 flex gap-2">
-                      <span className="text-zinc-600 shrink-0">·</span>{item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {prescription.cardio && (
-              <div>
-                <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">{prescription.cardio.label}</p>
-                <ul className="space-y-1">
-                  {prescription.cardio.options.map((opt, i) => (
-                    <li key={i} className="text-zinc-400 flex gap-2">
-                      <span className="text-zinc-600 shrink-0">·</span>{opt}
-                    </li>
-                  ))}
-                </ul>
-                {prescription.cardio.note && (
-                  <p className="text-xs text-zinc-500 mt-1 italic">{prescription.cardio.note}</p>
-                )}
-              </div>
-            )}
-
             {prescription.todaysGoal && (
               <p className="text-xs text-zinc-400 italic border-t border-zinc-800 pt-3">{prescription.todaysGoal}</p>
             )}
+          </div>
+        )}
+
+        {/* Warmup checklist */}
+        {warmupItems.length > 0 && (
+          <div>
+            <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">Warm-up</h2>
+            <div className="space-y-1.5">
+              {warmupItems.map((item, i) => (
+                <label key={i} className="flex items-start gap-3 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={item.done}
+                    onChange={() => setWarmupItems((prev) => prev.map((w, idx) => idx === i ? { ...w, done: !w.done } : w))}
+                    className="mt-0.5 accent-emerald-500 shrink-0"
+                  />
+                  <span className={`text-sm transition-colors ${item.done ? "line-through text-zinc-600" : "text-zinc-300"}`}>
+                    {item.label}
+                  </span>
+                </label>
+              ))}
+            </div>
           </div>
         )}
 
@@ -354,14 +358,35 @@ export default function LogSessionPage() {
           <div className="space-y-2">
             {exercises.map((ex, i) => (
               <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2">
-                <div className="flex gap-2">
-                  <input value={ex.name} onChange={(e) => updateExercise(i, "name", e.target.value)}
-                    placeholder="Exercise name"
-                    className="flex-1 rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
-                  {exercises.length > 1 && (
-                    <button type="button" onClick={() => setExercises((prev) => prev.filter((_, idx) => idx !== i))}
-                      className="text-zinc-600 hover:text-zinc-400 px-2">✕</button>
-                  )}
+                <div className="flex gap-2 items-center">
+                  <div className="relative flex-1">
+                    <input
+                      value={ex.name}
+                      onChange={(e) => updateExercise(i, "name", e.target.value)}
+                      placeholder="Exercise name"
+                      className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 pr-7 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                    />
+                    {ex.name && (
+                      <button
+                        type="button"
+                        onClick={() => updateExercise(i, "name", "")}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs leading-none"
+                        tabIndex={-1}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteExercise(i)}
+                    className="text-zinc-700 hover:text-red-500 transition-colors px-1 shrink-0"
+                    title="Remove exercise"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+                      <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 10.23 1.482l.149-.022.841 10.518A2.75 2.75 0 007.596 19h4.807a2.75 2.75 0 002.742-2.53l.841-10.52.149.023a.75.75 0 00.23-1.482A41.03 41.03 0 0014 4.193V3.75A2.75 2.75 0 0011.25 1h-2.5zM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4zM8.58 7.72a.75.75 0 00-1.5.06l.3 7.5a.75.75 0 101.5-.06l-.3-7.5zm4.34.06a.75.75 0 10-1.5-.06l-.3 7.5a.75.75 0 101.5.06l.3-7.5z" clipRule="evenodd" />
+                    </svg>
+                  </button>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
                   <input value={ex.sets} onChange={(e) => updateExercise(i, "sets", e.target.value)}
@@ -386,13 +411,66 @@ export default function LogSessionPage() {
           </button>
         </div>
 
+        {/* Finisher checklist */}
+        {finisherItems.length > 0 && (
+          <div>
+            <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2">
+              {prescription?.finisher?.label ?? "Finisher"}
+            </h2>
+            <div className="space-y-1.5">
+              {finisherItems.map((item, i) => (
+                <label key={i} className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={item.done}
+                    onChange={() => setFinisherItems((prev) => prev.map((f, idx) => idx === i ? { ...f, done: !f.done } : f))}
+                    className="mt-0.5 accent-amber-500 shrink-0"
+                  />
+                  <span className={`text-sm transition-colors ${item.done ? "line-through text-zinc-600" : "text-zinc-300"}`}>
+                    {item.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Cardio options */}
+        {prescription?.cardio && (
+          <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 space-y-1 text-sm">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">{prescription.cardio.label}</p>
+            <ul className="space-y-1">
+              {prescription.cardio.options.map((opt, i) => (
+                <li key={i} className="text-zinc-400 flex gap-2">
+                  <span className="text-zinc-600 shrink-0">·</span>{opt}
+                </li>
+              ))}
+            </ul>
+            {prescription.cardio.note && (
+              <p className="text-xs text-zinc-500 italic mt-1">{prescription.cardio.note}</p>
+            )}
+          </div>
+        )}
+
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
-        <button type="submit"
-          className="w-full rounded-lg bg-white text-zinc-950 px-4 py-3 font-semibold hover:bg-zinc-200 transition-colors">
-          Save & Analyze
-        </button>
-      </form>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleSaveOnly}
+            className="flex-1 rounded-lg bg-zinc-800 border border-zinc-700 text-white px-4 py-3 text-sm font-semibold hover:bg-zinc-700 transition-colors"
+          >
+            Save Session
+          </button>
+          <button
+            type="button"
+            onClick={handleSaveAndAnalyze}
+            className="flex-1 rounded-lg bg-white text-zinc-950 px-4 py-3 text-sm font-semibold hover:bg-zinc-200 transition-colors"
+          >
+            Save & Analyze
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
