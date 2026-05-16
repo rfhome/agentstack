@@ -58,6 +58,7 @@ export default function LogSessionPage() {
   const [finisherItems, setFinisherItems] = useState<CheckItem[]>([]);
   const [cardioEntries, setCardioEntries] = useState<CardioEntry[]>([]);
 
+  const [fillingFitbit, setFillingFitbit] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done">("idle");
@@ -71,6 +72,23 @@ export default function LogSessionPage() {
 
   function deleteExercise(i: number) {
     setExercises((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function handleFillFromFitbit() {
+    setFillingFitbit(true);
+    try {
+      const res = await fetch("/api/wearables/fitbit");
+      if (!res.ok) return;
+      const json = await res.json();
+      if (!json.connected || !json.data) return;
+      const d = json.data;
+      if (d.avgHeartRate != null && !avgHR) setAvgHR(String(d.avgHeartRate));
+      if (d.activeZoneMinutes != null && !azm) setAzm(String(d.activeZoneMinutes));
+    } catch {
+      // silent
+    } finally {
+      setFillingFitbit(false);
+    }
   }
 
   async function handleGetWorkout() {
@@ -298,7 +316,17 @@ export default function LogSessionPage() {
                 className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
             </div>
             <div>
-              <label className="block text-xs text-zinc-500 mb-1">AZM</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs text-zinc-500">AZM</label>
+                <button
+                  type="button"
+                  onClick={handleFillFromFitbit}
+                  disabled={fillingFitbit}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors disabled:opacity-50"
+                >
+                  {fillingFitbit ? "Filling..." : "Fill from Fitbit"}
+                </button>
+              </div>
               <input type="number" value={azm} onChange={(e) => setAzm(e.target.value)}
                 placeholder="34"
                 className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />

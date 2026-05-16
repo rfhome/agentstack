@@ -1,10 +1,12 @@
 export const dynamic = "force-dynamic";
 
 import Link from "next/link";
+import { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { SessionCard } from "@/components/SessionCard";
 import { RecommendationFeed } from "@/components/RecommendationFeed";
 import { GoalTracker } from "@/components/GoalTracker";
+import { WeeklySummary } from "@/components/WeeklySummary";
 
 export default async function FitnessPage() {
   const [sessions, recommendations, goals] = await Promise.all([
@@ -35,6 +37,13 @@ export default async function FitnessPage() {
           Log Session
         </Link>
       </div>
+
+      <section>
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">This Week</h2>
+        <Suspense fallback={null}>
+          <WeeklySummary />
+        </Suspense>
+      </section>
 
       <section>
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Recommendations</h2>
