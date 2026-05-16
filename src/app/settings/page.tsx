@@ -13,15 +13,36 @@ interface OuraStatus {
   error?: string;
 }
 
+interface FitbitHRZone {
+  name: string;
+  minutes: number;
+  caloriesOut: number;
+}
+
+interface FitbitStatus {
+  connected: boolean;
+  data?: {
+    heartRateZones: FitbitHRZone[];
+    activeZoneMinutes: number | null;
+    veryActiveMinutes: number | null;
+    fairlyActiveMinutes: number | null;
+  };
+  error?: string;
+}
+
 function SettingsContent() {
   const searchParams = useSearchParams();
   const [ouraStatus, setOuraStatus] = useState<OuraStatus | null>(null);
+  const [fitbitStatus, setFitbitStatus] = useState<FitbitStatus | null>(null);
   const oauthError = searchParams.get("error");
 
   useEffect(() => {
     fetch("/api/wearables/oura")
       .then((r) => r.json())
       .then(setOuraStatus);
+    fetch("/api/wearables/fitbit")
+      .then((r) => r.json())
+      .then(setFitbitStatus);
   }, []);
 
   async function disconnectOura() {
@@ -29,11 +50,20 @@ function SettingsContent() {
     setOuraStatus({ connected: false });
   }
 
+  async function disconnectFitbit() {
+    await fetch("/api/wearables/fitbit", { method: "DELETE" });
+    setFitbitStatus({ connected: false });
+  }
+
   const scoreColor = (score: number | null) =>
     score == null ? "text-zinc-400"
     : score >= 70 ? "text-emerald-400"
     : score >= 50 ? "text-amber-400"
     : "text-red-400";
+
+  const fitbitZones = fitbitStatus?.data?.heartRateZones?.filter(
+    (z) => ["Fat Burn", "Cardio", "Peak"].includes(z.name)
+  ) ?? [];
 
   return (
     <div className="space-y-8">
@@ -50,7 +80,7 @@ function SettingsContent() {
           )}
         </div>
 
-        {oauthError && (
+        {oauthError === "oura_oauth_failed" && (
           <p className="text-sm text-red-400">Connection failed — please try again.</p>
         )}
 
@@ -105,6 +135,72 @@ function SettingsContent() {
               className="inline-block bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
             >
               Connect Oura Ring
+            </a>
+          </div>
+        )}
+      </section>
+
+      {/* Fitbit */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-medium text-white">Fitbit</h2>
+          {fitbitStatus?.connected ? (
+            <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full">Connected</span>
+          ) : (
+            <span className="text-xs bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full">Not connected</span>
+          )}
+        </div>
+
+        {oauthError === "fitbit_oauth_failed" && (
+          <p className="text-sm text-red-400">Connection failed — please try again.</p>
+        )}
+
+        {fitbitStatus?.connected && fitbitStatus.data && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-2 text-sm">
+            {fitbitZones.length > 0 && (
+              <div className="space-y-1">
+                <p className="text-zinc-400 text-xs uppercase tracking-wide mb-2">HR Zones (today)</p>
+                {fitbitZones.map((zone) => (
+                  <div key={zone.name} className="flex items-center justify-between">
+                    <span className="text-zinc-400">{zone.name}</span>
+                    <span className="text-white font-medium">{zone.minutes} min</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            {fitbitStatus.data.activeZoneMinutes != null && (
+              <div className="flex items-center justify-between border-t border-zinc-800 pt-2">
+                <span className="text-zinc-400">Active Zone Minutes</span>
+                <span className="text-white font-medium">{fitbitStatus.data.activeZoneMinutes} AZM</span>
+              </div>
+            )}
+            {fitbitStatus.error && (
+              <p className="text-amber-400 text-xs mt-1">{fitbitStatus.error}</p>
+            )}
+          </div>
+        )}
+
+        {fitbitStatus === null && (
+          <div className="text-sm text-zinc-500">Loading...</div>
+        )}
+
+        {fitbitStatus?.connected ? (
+          <button
+            onClick={disconnectFitbit}
+            className="text-sm text-zinc-500 hover:text-red-400 transition-colors"
+          >
+            Disconnect Fitbit
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-zinc-400">
+              Connect your Fitbit to give Pulse real-time HR zone data — Fat Burn, Cardio, and Peak minutes — for precise session intensity classification.
+            </p>
+            <a
+              href="/api/wearables/fitbit/authorize"
+              className="inline-block bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            >
+              Connect Fitbit
             </a>
           </div>
         )}

@@ -8,6 +8,8 @@ When analyzing, always address:
 - Per-exercise performance: best lift, worst lift, any PRs hit or missed — use the "weights" field (per-set weights string, e.g. "95,95,100") as the source of truth for what was actually lifted
 - HR zone breakdown: classify the session by moderate vs vigorous zone minutes (AZM), flag if cardio load was unusually high or low
 - Energy/effort: infer from rating, notes, and HR whether the athlete was under/over-recovered
+
+When Fitbit data is present (under "fitbitContext"), use the HR zone breakdown (Fat Burn, Cardio, Peak minutes) to classify the session intensity and directly answer: how many minutes were spent in each zone, what was the dominant zone, and whether the cardio load was appropriate for the training goal.
 - Progressive overload: compare each exercise to recent history, call out what moved and what stalled
 
 CRITICAL: Your entire response must be a single valid JSON object. Do not write any text before or after it. Do not nest JSON inside string fields. The "analysis" field must be a plain string, not an object. Use this exact structure:

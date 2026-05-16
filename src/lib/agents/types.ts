@@ -24,6 +24,7 @@ export interface AgentInput {
   goals: { exercise: string; targetWeightLbs: number; targetReps: string }[];
   userContext: string;
   ouraContext?: string; // pre-formatted Oura readiness/sleep/HRV summary
+  fitbitContext?: string; // pre-formatted Fitbit HR zones and activity summary
 }
 
 export interface AgentResponse {

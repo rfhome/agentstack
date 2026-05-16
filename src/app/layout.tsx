@@ -25,6 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/fitness" className="text-sm text-zinc-400 hover:text-white transition-colors">
               Fitness
             </Link>
+            <Link href="/fitness/sessions" className="text-sm text-zinc-400 hover:text-white transition-colors">
+              History
+            </Link>
             <Link href="/settings" className="text-sm text-zinc-400 hover:text-white transition-colors">
               Settings
             </Link>

@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens } from "@/lib/oura";
+import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
 import type { AgentInput, SessionSummary } from "@/lib/agents/types";
 
 function toSessionSummary(s: {
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
     }
 
-    const [session, recentSessions, goals, userContext, ouraConn] = await Promise.all([
+    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn] = await Promise.all([
       prisma.session.findUnique({
         where: { id: sessionId, userId },
         include: { exercises: true },
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
       getUserContext(userId),
       prisma.wearableConnection.findUnique({
         where: { userId_provider: { userId, provider: "oura" } },
+        select: { id: true },
+      }),
+      prisma.wearableConnection.findUnique({
+        where: { userId_provider: { userId, provider: "fitbit" } },
         select: { id: true },
       }),
     ]);
@@ -83,6 +88,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    let fitbitContext: string | undefined;
+    if (fitbitConn) {
+      try {
+        const fitbitData = await fetchFitbitData(userId);
+        fitbitContext = formatFitbitForAgents(fitbitData);
+      } catch {
+        // Fitbit fetch failed — agents proceed without it
+      }
+    }
+
     const input: AgentInput = {
       sessionId,
       userId,
@@ -95,6 +110,7 @@ export async function POST(req: NextRequest) {
       })),
       userContext,
       ouraContext,
+      fitbitContext,
     };
 
     const result = await runOrchestrator(input);
