@@ -34,11 +34,12 @@ export async function PUT(req: NextRequest) {
     const userId = session.user.id;
     const { name, context } = (await req.json()) as { name: string; context: string };
 
-    await prisma.userProfile.upsert({
-      where: { userId },
-      create: { userId, name, context },
-      update: { name, context },
-    });
+    const existing = await prisma.userProfile.findFirst({ where: { userId } });
+    if (existing) {
+      await prisma.userProfile.update({ where: { id: existing.id }, data: { name, context } });
+    } else {
+      await prisma.userProfile.create({ data: { userId, name, context } });
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
