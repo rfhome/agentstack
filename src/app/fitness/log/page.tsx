@@ -79,10 +79,12 @@ export default function LogSessionPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [showDraftBanner, setShowDraftBanner] = useState(false);
 
+  const [savedSessionId, setSavedSessionId] = useState<number | null>(null);
+
   const [fillingFitbit, setFillingFitbit] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
-  const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done">("idle");
+  const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done" | "saved">("idle");
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
@@ -198,8 +200,10 @@ export default function LogSessionPage() {
   }
 
   async function saveSession(): Promise<number> {
-    const sessionRes = await fetch("/api/sessions", {
-      method: "POST",
+    const url = savedSessionId ? `/api/sessions/${savedSessionId}` : "/api/sessions";
+    const method = savedSessionId ? "PUT" : "POST";
+    const sessionRes = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         session: {
@@ -244,9 +248,10 @@ export default function LogSessionPage() {
     setError("");
     setStep("saving");
     try {
-      await saveSession();
+      const sessionId = await saveSession();
       localStorage.removeItem(DRAFT_KEY);
-      router.push("/fitness");
+      setSavedSessionId(sessionId);
+      setStep("saved");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setStep("idle");
@@ -324,6 +329,38 @@ export default function LogSessionPage() {
         >
           Back to Fitness
         </button>
+      </div>
+    );
+  }
+
+  if (step === "saved") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Session saved</h1>
+          <p className="text-sm text-zinc-500">What would you like to do next?</p>
+        </div>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 space-y-3">
+          <button
+            onClick={() => setStep("idle")}
+            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 hover:text-white text-sm py-3 font-medium transition-colors text-left px-4 flex items-center gap-3"
+          >
+            <span className="text-lg">✎</span>
+            <span>Continue editing this session</span>
+          </button>
+          <button
+            onClick={handleSaveAndAnalyze}
+            className="w-full rounded-lg bg-white text-zinc-950 hover:bg-zinc-200 text-sm py-3 font-medium transition-colors"
+          >
+            Analyze this session
+          </button>
+          <button
+            onClick={() => router.push("/fitness")}
+            className="w-full rounded-lg border border-zinc-800 text-zinc-500 hover:text-zinc-300 text-sm py-3 transition-colors"
+          >
+            Done — back to Fitness
+          </button>
+        </div>
       </div>
     );
   }
