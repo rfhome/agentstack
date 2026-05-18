@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
 
 type Exercise = { name: string; sets: string; reps: string; weights: string; notes: string };
@@ -61,6 +61,7 @@ function emptyExercise(): Exercise {
 
 export default function LogSessionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [cycleDay, setCycleDay] = useState("1");
@@ -88,6 +89,52 @@ export default function LogSessionPage() {
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
+
+  // Load existing session when opened via ?edit=ID
+  useEffect(() => {
+    const editId = searchParams.get("edit");
+    if (!editId) return;
+    const sessionId = parseInt(editId);
+    if (isNaN(sessionId)) return;
+    fetch(`/api/sessions/${sessionId}`)
+      .then((r) => r.json())
+      .then((s) => {
+        setSavedSessionId(sessionId);
+        setDate(s.date ? new Date(s.date).toISOString().split("T")[0] : new Date().toISOString().split("T")[0]);
+        if (s.cycleDay != null) setCycleDay(String(s.cycleDay));
+        if (s.cycleNumber != null) setCycleNumber(String(s.cycleNumber));
+        if (s.durationMinutes != null) setDuration(String(s.durationMinutes));
+        if (s.avgHeartRate != null) setAvgHR(String(s.avgHeartRate));
+        if (s.cardioLoad != null) setCardioLoad(String(s.cardioLoad));
+        if (s.activeZoneMinutes != null) setAzm(String(s.activeZoneMinutes));
+        if (s.rating) setRating(s.rating);
+        if (s.notes) setNotes(s.notes);
+        if (s.exercises?.length) {
+          setExercises(s.exercises.map((e: { name: string; sets: number | null; reps: string | null; weights: string | null; notes: string | null }) => ({
+            name: e.name ?? "",
+            sets: e.sets != null ? String(e.sets) : "",
+            reps: e.reps ?? "",
+            weights: e.weights ?? "",
+            notes: e.notes ?? "",
+          })));
+        }
+        if (s.cardioActivities?.length) {
+          setCardioEntries(s.cardioActivities.map((c: { tag: string; machine: string; durationMin: number | null; distanceMi: number | null; calories: number | null; avgHR: number | null; maxHR: number | null }) => ({
+            tag: c.tag as CardioEntry["tag"],
+            machine: c.machine as CardioEntry["machine"],
+            durationMin: c.durationMin != null ? String(c.durationMin) : "",
+            distanceMi: c.distanceMi != null ? String(c.distanceMi) : "",
+            calories: c.calories != null ? String(c.calories) : "",
+            avgHR: c.avgHR != null ? String(c.avgHR) : "",
+            maxHR: c.maxHR != null ? String(c.maxHR) : "",
+            analyzing: false,
+            analyzed: false,
+          })));
+        }
+      })
+      .catch(() => { /* ignore — user can fill manually */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load draft on mount
   useEffect(() => {

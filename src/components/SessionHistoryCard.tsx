@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 type Exercise = {
   id: number;
@@ -140,6 +141,15 @@ export function SessionHistoryCard({ session }: { session: Session }) {
               <span className="text-xs px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-400">
                 Analyzed
               </span>
+            )}
+            {!analyzed && (
+              <Link
+                href={`/fitness/log?edit=${session.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                Edit
+              </Link>
             )}
             {session.rating && (
               <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${RATING_BADGE[session.rating] ?? "bg-zinc-800 text-zinc-400"}`}>

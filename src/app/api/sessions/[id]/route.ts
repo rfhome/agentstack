@@ -2,6 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const authSession = await auth();
+    if (!authSession?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = authSession.user.id;
+    const { id } = await params;
+    const sessionId = parseInt(id);
+    if (isNaN(sessionId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+    const session = await withRLS(userId, (db) =>
+      db.session.findUnique({
+        where: { id: sessionId, userId },
+        include: { exercises: true, cardioActivities: true },
+      })
+    );
+    if (!session) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return NextResponse.json(session);
+  } catch (err) {
+    console.error("[GET /api/sessions/[id]]", err);
+    return NextResponse.json({ error: "Failed to fetch session" }, { status: 500 });
+  }
+}
+
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authSession = await auth();
