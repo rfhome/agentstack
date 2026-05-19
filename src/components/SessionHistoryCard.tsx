@@ -142,7 +142,7 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             {!analyzed && (
               <Link
                 href={`/fitness/log?edit=${session.id}`}
-                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+                className="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
               >
                 Edit
               </Link>
