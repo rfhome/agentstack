@@ -122,12 +122,9 @@ export function SessionHistoryCard({ session }: { session: Session }) {
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900">
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full text-left px-4 py-4"
-      >
+      <div className="px-4 py-4">
         <div className="flex items-center justify-between">
-          <div>
+          <button onClick={() => setExpanded((v) => !v)} className="flex-1 text-left min-w-0">
             <span className="text-xs text-zinc-500">{date}</span>
             <h3 className="font-semibold text-white">
               {cycleLabel}
@@ -135,8 +132,8 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                 <span className="text-zinc-400 font-normal"> · Cycle {session.cycleNumber}</span>
               ) : null}
             </h3>
-          </div>
-          <div className="flex items-center gap-2">
+          </button>
+          <div className="flex items-center gap-2 shrink-0 ml-2">
             {analyzed && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-violet-900/40 text-violet-400">
                 Analyzed
@@ -145,7 +142,6 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             {!analyzed && (
               <Link
                 href={`/fitness/log?edit=${session.id}`}
-                onClick={(e) => e.stopPropagation()}
                 className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
               >
                 Edit
@@ -156,18 +152,22 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                 {session.rating}
               </span>
             )}
-            <span className="text-zinc-500 text-xs ml-1">{expanded ? "▾" : "▸"}</span>
+            <button onClick={() => setExpanded((v) => !v)} className="text-zinc-500 text-xs ml-1">
+              {expanded ? "▾" : "▸"}
+            </button>
           </div>
         </div>
 
-        <div className="flex gap-4 text-xs text-zinc-500 mt-1.5">
-          {session.durationMinutes ? <span>{session.durationMinutes}min</span> : null}
-          {session.avgHeartRate ? <span>{session.avgHeartRate}bpm avg HR</span> : null}
-          {session.exercises.length > 0 ? (
-            <span>{session.exercises.length} exercise{session.exercises.length !== 1 ? "s" : ""}</span>
-          ) : null}
-        </div>
-      </button>
+        <button onClick={() => setExpanded((v) => !v)} className="w-full text-left">
+          <div className="flex gap-4 text-xs text-zinc-500 mt-1.5">
+            {session.durationMinutes ? <span>{session.durationMinutes}min</span> : null}
+            {session.avgHeartRate ? <span>{session.avgHeartRate}bpm avg HR</span> : null}
+            {session.exercises.length > 0 ? (
+              <span>{session.exercises.length} exercise{session.exercises.length !== 1 ? "s" : ""}</span>
+            ) : null}
+          </div>
+        </button>
+      </div>
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-zinc-800 pt-4">
