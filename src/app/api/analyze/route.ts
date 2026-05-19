@@ -3,7 +3,7 @@ import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
-import { fetchOuraData, formatOuraForLens } from "@/lib/oura";
+import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
 import type { AgentInput, SessionSummary } from "@/lib/agents/types";
 
@@ -89,20 +89,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
+    const sessionDate = session.date.toISOString().split("T")[0];
+    const storedSnapshot = (session.wearableSnapshot ?? {}) as Record<string, unknown>;
+
     let ouraContext: string | undefined;
     if (ouraConn) {
       try {
-        const ouraData = await fetchOuraData(userId);
-        ouraContext = formatOuraForLens(ouraData);
+        const ouraData = await fetchOuraData(userId, sessionDate);
+        // Merge stored recovery (readiness/sleep from save time) with fresh activity data
+        const stored = storedSnapshot.oura as { readiness?: OuraReadiness; sleep?: OuraSleep } | undefined;
+        const merged: OuraData = {
+          ...ouraData,
+          readiness: ouraData.readiness ?? stored?.readiness ?? null,
+          sleep: ouraData.sleep ?? stored?.sleep ?? null,
+        };
+        ouraContext = formatOuraForLens(merged);
       } catch {
-        // Oura fetch failed — agents proceed without it
+        // Fall back to stored snapshot if live fetch fails
+        const stored = storedSnapshot.oura as { readiness?: OuraReadiness; sleep?: OuraSleep } | undefined;
+        if (stored) {
+          ouraContext = formatOuraForLens({ readiness: stored.readiness ?? null, sleep: stored.sleep ?? null, activity: null, fetchedAt: "" });
+        }
       }
     }
 
     let fitbitContext: string | undefined;
     if (fitbitConn) {
       try {
-        const fitbitData = await fetchFitbitData(userId);
+        const fitbitData = await fetchFitbitData(userId, sessionDate);
         fitbitContext = formatFitbitForAgents(fitbitData);
       } catch {
         // Fitbit fetch failed — agents proceed without it

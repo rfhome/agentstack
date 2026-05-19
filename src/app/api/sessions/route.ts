@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
+import { fetchOuraRecovery } from "@/lib/oura";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,10 @@ export async function POST(req: NextRequest) {
       }[];
     };
 
+    const sessionDate = session.date
+      ? new Date(session.date).toISOString().split("T")[0]
+      : new Date().toISOString().split("T")[0];
+
     const created = await withRLS(authSession.user.id, (db) => db.session.create({
       data: {
         ...session,
@@ -79,6 +84,22 @@ export async function POST(req: NextRequest) {
       },
       include: { exercises: true, cardioActivities: true },
     }));
+
+    // Fetch Oura recovery data for this session date in the background (non-blocking)
+    const ouraConn = await prisma.wearableConnection.findUnique({
+      where: { userId_provider: { userId: authSession.user.id, provider: "oura" } },
+      select: { id: true },
+    });
+    if (ouraConn) {
+      fetchOuraRecovery(authSession.user.id, sessionDate)
+        .then((recovery) =>
+          prisma.session.update({
+            where: { id: created.id },
+            data: { wearableSnapshot: JSON.parse(JSON.stringify({ oura: recovery, savedAt: new Date().toISOString() })) },
+          })
+        )
+        .catch(() => {}); // silent — wearable data is best-effort
+    }
 
     return NextResponse.json({ sessionId: created.id, session: created }, { status: 201 });
   } catch (err) {

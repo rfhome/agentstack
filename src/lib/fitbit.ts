@@ -63,19 +63,19 @@ async function getValidToken(userId: string): Promise<string> {
   return conn.accessToken;
 }
 
-function startOfTodayMs(): number {
-  const d = new Date();
+function startOfDayMs(dateStr?: string): number {
+  const d = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
 
-function endOfTodayMs(): number {
-  const d = new Date();
+function endOfDayMs(dateStr?: string): number {
+  const d = dateStr ? new Date(dateStr + "T00:00:00") : new Date();
   d.setHours(23, 59, 59, 999);
   return d.getTime();
 }
 
-export async function fetchFitbitData(userId: string): Promise<FitbitData> {
+export async function fetchFitbitData(userId: string, sessionDate?: string): Promise<FitbitData> {
   const token = await getValidToken(userId);
 
   const body = {
@@ -87,8 +87,8 @@ export async function fetchFitbitData(userId: string): Promise<FitbitData> {
       { dataTypeName: "com.google.calories.expended" },
     ],
     bucketByTime: { durationMillis: 86400000 },
-    startTimeMillis: startOfTodayMs(),
-    endTimeMillis: endOfTodayMs(),
+    startTimeMillis: startOfDayMs(sessionDate),
+    endTimeMillis: endOfDayMs(sessionDate),
   };
 
   const res = await fetch(GOOGLE_FIT_AGGREGATE, {

@@ -28,9 +28,24 @@ export interface OuraSleep {
   rem_sleep_duration: number | null;
 }
 
+export interface OuraActivity {
+  date: string;
+  score: number | null;
+  active_calories: number | null;
+  total_calories: number | null;
+  steps: number | null;
+  equivalent_walking_distance: number | null;
+  high_activity_time: number | null;   // seconds
+  medium_activity_time: number | null; // seconds
+  low_activity_time: number | null;    // seconds
+  resting_time: number | null;         // seconds
+  sedentary_time: number | null;       // seconds
+}
+
 export interface OuraData {
   readiness: OuraReadiness | null;
   sleep: OuraSleep | null;
+  activity: OuraActivity | null;
   fetchedAt: string;
 }
 
@@ -65,7 +80,6 @@ async function getValidToken(userId: string): Promise<string> {
   });
   if (!conn) throw new Error("Oura not connected");
 
-  // Refresh if expired or expiring within 5 min
   const needsRefresh = conn.expiresAt && conn.expiresAt.getTime() < Date.now() + 5 * 60 * 1000;
   if (needsRefresh && conn.refreshToken) {
     return refreshAccessToken(userId, conn.refreshToken);
@@ -84,20 +98,23 @@ async function ouraGet<T>(path: string, token: string, params: Record<string, st
   return res.json() as Promise<T>;
 }
 
-function yesterday(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
+function dateString(d: Date): string {
   return d.toISOString().split("T")[0];
 }
 
-function today(): string {
-  return new Date().toISOString().split("T")[0];
+function prevDay(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00Z");
+  d.setDate(d.getDate() - 1);
+  return dateString(d);
 }
 
-export async function fetchOuraData(userId: string): Promise<OuraData> {
+/** Fetch readiness + sleep only (for save time — morning context). */
+export async function fetchOuraRecovery(userId: string, sessionDate: string): Promise<Pick<OuraData, "readiness" | "sleep">> {
   const token = await getValidToken(userId);
-  const start = yesterday();
-  const end = today();
+  // Oura's readiness/sleep scores for a given date reflect the night before —
+  // so we fetch the session date and the day before to get whichever is most recent.
+  const start = prevDay(sessionDate);
+  const end = sessionDate;
 
   const [readinessRes, sleepRes] = await Promise.allSettled([
     ouraGet<{ data: OuraReadiness[] }>("daily_readiness", token, { start_date: start, end_date: end }),
@@ -114,7 +131,38 @@ export async function fetchOuraData(userId: string): Promise<OuraData> {
       ? sleepRes.value.data[sleepRes.value.data.length - 1]
       : null;
 
-  return { readiness, sleep, fetchedAt: new Date().toISOString() };
+  return { readiness, sleep };
+}
+
+/** Fetch all Oura data for a date (for analyze time — full day picture). */
+export async function fetchOuraData(userId: string, sessionDate?: string): Promise<OuraData> {
+  const token = await getValidToken(userId);
+  const target = sessionDate ?? dateString(new Date());
+  const start = prevDay(target);
+  const end = target;
+
+  const [readinessRes, sleepRes, activityRes] = await Promise.allSettled([
+    ouraGet<{ data: OuraReadiness[] }>("daily_readiness", token, { start_date: start, end_date: end }),
+    ouraGet<{ data: OuraSleep[] }>("daily_sleep", token, { start_date: start, end_date: end }),
+    ouraGet<{ data: OuraActivity[] }>("daily_activity", token, { start_date: target, end_date: target }),
+  ]);
+
+  const readiness =
+    readinessRes.status === "fulfilled" && readinessRes.value.data.length > 0
+      ? readinessRes.value.data[readinessRes.value.data.length - 1]
+      : null;
+
+  const sleep =
+    sleepRes.status === "fulfilled" && sleepRes.value.data.length > 0
+      ? sleepRes.value.data[sleepRes.value.data.length - 1]
+      : null;
+
+  const activity =
+    activityRes.status === "fulfilled" && activityRes.value.data.length > 0
+      ? activityRes.value.data[0]
+      : null;
+
+  return { readiness, sleep, activity, fetchedAt: new Date().toISOString() };
 }
 
 export function formatOuraForLens(data: OuraData): string {
@@ -144,6 +192,17 @@ export function formatOuraForLens(data: OuraData): string {
     }
   } else {
     lines.push("**Sleep:** not available");
+  }
+
+  if (data.activity) {
+    const a = data.activity;
+    const highMin = a.high_activity_time != null ? Math.round(a.high_activity_time / 60) : null;
+    const medMin = a.medium_activity_time != null ? Math.round(a.medium_activity_time / 60) : null;
+    lines.push(`**Activity (${a.date}):** score ${a.score ?? "n/a"}/100`);
+    lines.push(`  Steps: ${a.steps?.toLocaleString() ?? "n/a"}, Active calories: ${a.active_calories ?? "n/a"}`);
+    if (highMin != null || medMin != null) {
+      lines.push(`  High intensity: ${highMin ?? "n/a"} min, Medium: ${medMin ?? "n/a"} min`);
+    }
   }
 
   return lines.join("\n");
