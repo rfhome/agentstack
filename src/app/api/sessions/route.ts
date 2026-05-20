@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { session, exercises, cardioActivities } = body as {
+    const { session, exercises, cardioActivities, images } = body as {
       session: {
         date?: string;
         cycleDay?: number;
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
         maxHR?: number;
         notes?: string;
       }[];
+      images?: { data: string; mediaType: string; name: string }[];
     };
 
     const sessionDate = session.date
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
         ...session,
         userId: authSession.user.id,
         date: session.date ? new Date(session.date + "T12:00:00.000Z") : new Date(),
+        images: images && images.length > 0 ? JSON.parse(JSON.stringify(images)) : undefined,
         exercises: {
           create: exercises ?? [],
         },

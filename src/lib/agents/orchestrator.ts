@@ -36,11 +36,27 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
   const start = Date.now();
   const nexusPrompt = JSON.stringify({ agentResponses, sessionContext: input.sessionData }, null, 2);
 
+  type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  type ContentBlock =
+    | { type: "text"; text: string }
+    | { type: "image"; source: { type: "base64"; media_type: ImageMediaType; data: string } };
+
+  const nexusContent: ContentBlock[] = [{ type: "text", text: nexusPrompt }];
+  if (input.images?.length) {
+    nexusContent.push({ type: "text", text: "\nWorkout screenshots for additional context:" });
+    for (const img of input.images) {
+      nexusContent.push({
+        type: "image",
+        source: { type: "base64", media_type: img.mediaType as ImageMediaType, data: img.data },
+      });
+    }
+  }
+
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
     system: NEXUS_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: nexusPrompt }],
+    messages: [{ role: "user", content: nexusContent }],
   });
 
   const latencyMs = Date.now() - start;

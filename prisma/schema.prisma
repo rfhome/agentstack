@@ -57,6 +57,7 @@ model Session {
   agentLogs         AgentLog[]
   recommendations   Recommendation[]
   wearableSnapshot  Json?
+  images            Json?
   createdAt         DateTime         @default(now())
 }
 

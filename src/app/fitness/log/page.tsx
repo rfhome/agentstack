@@ -85,6 +85,7 @@ export default function LogSessionPage() {
   const [fillingFitbit, setFillingFitbit] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
+  const [images, setImages] = useState<{ data: string; mediaType: string; name: string }[]>([]);
   const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done" | "saved">("idle");
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
@@ -130,6 +131,9 @@ export default function LogSessionPage() {
             analyzing: false,
             analyzed: false,
           })));
+        }
+        if (s.images?.length) {
+          setImages(s.images as { data: string; mediaType: string; name: string }[]);
         }
       })
       .catch(() => { /* ignore — user can fill manually */ });
@@ -284,6 +288,7 @@ export default function LogSessionPage() {
             avgHR: c.avgHR ? parseInt(c.avgHR) : undefined,
             maxHR: c.maxHR ? parseInt(c.maxHR) : undefined,
           })),
+        images: images.length > 0 ? images : undefined,
       }),
     });
     if (!sessionRes.ok) throw new Error("Failed to save session");
@@ -901,6 +906,58 @@ export default function LogSessionPage() {
             )}
           </div>
         )}
+
+        {/* Screenshot upload */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs text-zinc-500">Screenshots <span className="text-zinc-600">(Fitbit, machine summary, HR chart)</span></label>
+            {images.length < 4 && (
+              <label className="text-xs text-zinc-400 hover:text-white cursor-pointer transition-colors">
+                + Add photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                      const result = reader.result as string;
+                      // result is "data:image/jpeg;base64,XXXX" — split off the prefix
+                      const [prefix, data] = result.split(",");
+                      const mediaType = prefix.match(/:(.*?);/)?.[1] ?? "image/jpeg";
+                      setImages((prev) => [...prev, { data, mediaType, name: file.name }]);
+                    };
+                    reader.readAsDataURL(file);
+                    e.target.value = ""; // reset so same file can be re-added
+                  }}
+                />
+              </label>
+            )}
+          </div>
+          {images.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {images.map((img, i) => (
+                <div key={i} className="relative group">
+                  <img
+                    src={`data:${img.mediaType};base64,${img.data}`}
+                    alt={img.name}
+                    className="w-20 h-20 object-cover rounded-lg border border-zinc-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-600 text-zinc-400 hover:text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    ×
+                  </button>
+                  <p className="text-xs text-zinc-600 truncate w-20 mt-0.5">{img.name}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 

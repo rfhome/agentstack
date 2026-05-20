@@ -28,13 +28,32 @@ CRITICAL: Your entire response must be a single valid JSON object. Do not write 
 export async function runPulse(input: AgentInput): Promise<AgentResponse> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const start = Date.now();
-  const prompt = JSON.stringify(input, null, 2);
+
+  // Exclude images from the JSON text prompt (passed separately as vision blocks)
+  const { images, ...inputWithoutImages } = input;
+  const prompt = JSON.stringify(inputWithoutImages, null, 2);
+
+  type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
+  type ContentBlock =
+    | { type: "text"; text: string }
+    | { type: "image"; source: { type: "base64"; media_type: ImageMediaType; data: string } };
+
+  const content: ContentBlock[] = [{ type: "text", text: prompt }];
+  if (images?.length) {
+    content.push({ type: "text", text: "\nThe following workout screenshots are attached. Use them to extract HR zone data, machine summaries, and any metrics visible in the images:" });
+    for (const img of images) {
+      content.push({
+        type: "image",
+        source: { type: "base64", media_type: img.mediaType as ImageMediaType, data: img.data },
+      });
+    }
+  }
 
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
     max_tokens: 1024,
     system: SYSTEM_PROMPT,
-    messages: [{ role: "user", content: prompt }],
+    messages: [{ role: "user", content }],
   });
 
   const latencyMs = Date.now() - start;

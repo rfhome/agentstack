@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (isNaN(sessionId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
 
     const body = await req.json();
-    const { session, exercises, cardioActivities } = body as {
+    const { session, exercises, cardioActivities, images } = body as {
       session: {
         date?: string;
         cycleDay?: number;
@@ -67,6 +67,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         maxHR?: number;
         notes?: string;
       }[];
+      images?: { data: string; mediaType: string; name: string }[];
     };
 
     await withRLS(userId, async (db) => {
@@ -83,6 +84,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         data: {
           ...session,
           date: session.date ? new Date(session.date + "T12:00:00.000Z") : undefined,
+          images: images ? JSON.parse(JSON.stringify(images)) : undefined,
           exercises: { create: exercises ?? [] },
           cardioActivities: {
             create: (cardioActivities ?? []).map((c) => ({ ...c, userId })),

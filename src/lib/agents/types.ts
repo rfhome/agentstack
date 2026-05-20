@@ -24,6 +24,12 @@ export interface SessionSummary {
   }[];
 }
 
+export interface SessionImage {
+  data: string;       // base64-encoded image data
+  mediaType: string;  // e.g. "image/jpeg", "image/png"
+  name: string;       // original filename
+}
+
 export interface AgentInput {
   sessionId?: number;
   userId?: string;
@@ -31,8 +37,9 @@ export interface AgentInput {
   recentHistory: SessionSummary[];
   goals: { exercise: string; targetWeightLbs: number; targetReps: string }[];
   userContext: string;
-  ouraContext?: string; // pre-formatted Oura readiness/sleep/HRV summary
-  fitbitContext?: string; // pre-formatted Fitbit HR zones and activity summary
+  ouraContext?: string;
+  fitbitContext?: string;
+  images?: SessionImage[]; // workout screenshots (e.g. Fitbit HR chart, machine summary)
 }
 
 export interface AgentResponse {

@@ -5,7 +5,7 @@ import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
-import type { AgentInput, SessionSummary } from "@/lib/agents/types";
+import type { AgentInput, SessionSummary, SessionImage } from "@/lib/agents/types";
 
 function toSessionSummary(s: {
   date: Date;
@@ -123,6 +123,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const sessionImages = (session.images ?? []) as unknown as SessionImage[];
+
     const input: AgentInput = {
       sessionId,
       userId,
@@ -136,6 +138,7 @@ export async function POST(req: NextRequest) {
       userContext,
       ouraContext,
       fitbitContext,
+      images: sessionImages.length > 0 ? sessionImages : undefined,
     };
 
     const result = await runOrchestrator(input);
