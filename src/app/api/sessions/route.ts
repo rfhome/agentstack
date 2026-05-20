@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
       data: {
         ...session,
         userId: authSession.user.id,
-        date: session.date ? new Date(session.date) : new Date(),
+        date: session.date ? new Date(session.date + "T12:00:00.000Z") : new Date(),
         exercises: {
           create: exercises ?? [],
         },

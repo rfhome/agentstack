@@ -82,7 +82,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         where: { id: sessionId },
         data: {
           ...session,
-          date: session.date ? new Date(session.date) : undefined,
+          date: session.date ? new Date(session.date + "T12:00:00.000Z") : undefined,
           exercises: { create: exercises ?? [] },
           cardioActivities: {
             create: (cardioActivities ?? []).map((c) => ({ ...c, userId })),

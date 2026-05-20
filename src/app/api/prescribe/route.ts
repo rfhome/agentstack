@@ -6,6 +6,8 @@ import OpenAI from "openai";
 
 const SYSTEM_PROMPT = `You are Forge, a strength program architect. Based on the user's recent training history, goals, and user context, prescribe a complete workout for their requested cycle day.
 
+CRITICAL: You MUST generate a workout for the exact cycleDay and cycleLabel specified in requestedCycleDay/cycleLabel. Never substitute a different day. If there is no recent history for that cycle day, use the cycleLabel to determine the muscle group (Push = chest/shoulders/triceps, Pull = back/biceps, Legs = quads/hamstrings/glutes, Arms = biceps/triceps isolation) and prescribe accordingly based on the user's overall training profile.
+
 Return only valid JSON with this exact structure, no markdown, no preamble:
 {
   "cycleDay": 1,
@@ -50,11 +52,11 @@ export async function GET(req: NextRequest) {
 
     const cycleDay = parseInt(req.nextUrl.searchParams.get("cycleDay") ?? "1");
 
-    const [recentSessions, goals, userContext] = await withRLS(userId, (db) =>
+    const [allRecentSessions, goals, userContext] = await withRLS(userId, (db) =>
       Promise.all([
         db.session.findMany({
-          where: { userId, cycleDay },
-          take: 3,
+          where: { userId },
+          take: 8,
           orderBy: { date: "desc" },
           include: { exercises: true },
         }),
@@ -63,21 +65,30 @@ export async function GET(req: NextRequest) {
       ])
     );
 
+    // Split: last 3 sessions for this specific cycle day (direct history) + recent other days for context
+    const dayHistory = allRecentSessions.filter((s) => s.cycleDay === cycleDay).slice(0, 3);
+    const otherHistory = allRecentSessions.filter((s) => s.cycleDay !== cycleDay).slice(0, 4);
+
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    const serializeSession = (s: typeof allRecentSessions[0]) => ({
+      date: s.date.toISOString().split("T")[0],
+      cycleDay: s.cycleDay,
+      cycleLabel: CYCLE_LABELS[s.cycleDay ?? 0] ?? `Day ${s.cycleDay}`,
+      rating: s.rating,
+      exercises: s.exercises.map((e) => ({
+        name: e.name,
+        sets: e.sets,
+        reps: e.reps,
+        weights: e.weights ?? (e.weightLbs ? String(e.weightLbs) : null),
+      })),
+    });
 
     const prompt = JSON.stringify({
       requestedCycleDay: cycleDay,
       cycleLabel: CYCLE_LABELS[cycleDay] ?? `Day ${cycleDay}`,
-      recentSessions: recentSessions.map((s) => ({
-        date: s.date.toISOString().split("T")[0],
-        rating: s.rating,
-        exercises: s.exercises.map((e) => ({
-          name: e.name,
-          sets: e.sets,
-          reps: e.reps,
-          weights: e.weights ?? (e.weightLbs ? String(e.weightLbs) : null),
-        })),
-      })),
+      recentHistoryForThisDay: dayHistory.map(serializeSession),
+      otherRecentSessions: otherHistory.map(serializeSession),
       goals: goals.map((g: { exercise: string; targetWeightLbs: number | null; targetReps: string | null }) => ({
         exercise: g.exercise,
         targetWeightLbs: g.targetWeightLbs,
