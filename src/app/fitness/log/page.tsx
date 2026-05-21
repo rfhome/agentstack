@@ -418,12 +418,59 @@ export default function LogSessionPage() {
   }
 
   if (step === "analyzing" || step === "saving") {
+    const cycleLabel = cycleDay === "1" ? "Push" : cycleDay === "2" ? "Pull" : cycleDay === "3" ? "Legs" : cycleDay === "4" ? "Arms" : `Day ${cycleDay}`;
+    const savedExercises = exercises.filter(ex => ex.name.trim());
+    const savedCardio = cardioEntries.filter(c => c.tag && c.machine);
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <div className="w-8 h-8 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
-        <p className="text-zinc-400 text-sm">
-          {step === "saving" ? "Saving session..." : ANALYZING_STEPS[analyzeStep]}
-        </p>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center gap-3 py-6">
+          <div className="w-8 h-8 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+          <p className="text-zinc-400 text-sm">
+            {step === "saving" ? "Saving session..." : ANALYZING_STEPS[analyzeStep]}
+          </p>
+        </div>
+        {/* Session summary so you can verify what was saved */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-zinc-500">{new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
+              <p className="font-semibold text-white">{cycleLabel}{cycleNumber ? ` · Cycle ${cycleNumber}` : ""}</p>
+            </div>
+            <div className="text-right text-xs text-zinc-500 space-y-0.5">
+              {duration && <p>{duration} min</p>}
+              {avgHR && <p>{avgHR} bpm avg</p>}
+              {rating && <p className="font-semibold text-zinc-300">{rating}</p>}
+            </div>
+          </div>
+          {savedExercises.length > 0 && (
+            <div className="space-y-1 border-t border-zinc-800 pt-3">
+              {savedExercises.map((ex, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-zinc-300">{ex.name}</span>
+                  <span className="text-zinc-500 tabular-nums text-xs">
+                    {ex.sets && ex.reps ? `${ex.sets}×${ex.reps}` : ""}
+                    {ex.weights ? ` @ ${ex.weights}` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {savedCardio.length > 0 && (
+            <div className="space-y-1 border-t border-zinc-800 pt-3">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Cardio</p>
+              {savedCardio.map((c, i) => (
+                <div key={i} className="flex justify-between text-sm">
+                  <span className="text-zinc-300 capitalize">{c.machine} <span className="text-zinc-500 normal-case">({c.tag})</span></span>
+                  <span className="text-zinc-500 tabular-nums text-xs">
+                    {c.durationMin ? `${c.durationMin}min` : ""}
+                    {c.distanceMi ? ` · ${c.distanceMi}mi` : ""}
+                    {c.avgHR ? ` · ${c.avgHR}bpm` : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     );
   }

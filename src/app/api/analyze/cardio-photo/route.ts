@@ -60,7 +60,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(parsed);
+    // Normalize to the field names the log form expects
+    return NextResponse.json({
+      durationMin: parsed.durationMinutes,
+      distanceMi: parsed.distanceMiles,
+      calories: parsed.calories,
+      avgHR: parsed.avgHeartRate,
+      maxHR: parsed.maxHeartRate,
+    });
   } catch (err) {
     console.error("[POST /api/analyze/cardio-photo]", err);
     return NextResponse.json({ error: "Failed to analyze cardio photo" }, { status: 500 });
