@@ -5,5 +5,6 @@ const { auth } = NextAuth(authConfig);
 export default auth;
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // Exclude static Next.js assets, public PWA files (manifest, icons, SW), and favicon
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|icon.*\\.png).*)"],
 };
