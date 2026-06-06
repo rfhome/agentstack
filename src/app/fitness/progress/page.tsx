@@ -34,6 +34,14 @@ interface ProgressData {
   trainingDays: string[];
 }
 
+interface TrendPoint {
+  date: string;
+  readiness: number | null;
+  sleep: number | null;
+  hrv: number | null;
+  restingHR: number | null;
+}
+
 // ─── Frequency heatmap ───────────────────────────────────────────────────────
 
 const INTENSITY = ["bg-zinc-800", "bg-violet-900", "bg-violet-700", "bg-violet-500", "bg-violet-400"];
@@ -147,6 +155,79 @@ function PRCard({ pr }: { pr: PR }) {
   );
 }
 
+// ─── Recovery trend chart ────────────────────────────────────────────────────
+
+function RecoveryTrendChart({ trend }: { trend: TrendPoint[] }) {
+  if (trend.length === 0) return null;
+
+  const chartData = trend.map((p) => ({
+    label: formatDate(p.date),
+    readiness: p.readiness,
+    sleep: p.sleep,
+    hrv: p.hrv,
+  }));
+
+  const hasReadiness = trend.some((p) => p.readiness !== null);
+  const hasSleep = trend.some((p) => p.sleep !== null);
+  const hasHRV = trend.some((p) => p.hrv !== null);
+
+  const tooltipStyle = {
+    backgroundColor: "#18181b",
+    border: "1px solid #3f3f46",
+    borderRadius: "8px",
+    color: "#f4f4f5",
+    fontSize: 12,
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Readiness + Sleep scores */}
+      {(hasReadiness || hasSleep) && (
+        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4">
+          <p className="text-xs text-zinc-500 mb-3">Score (0–100)</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
+              <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis domain={[0, 100]} tick={{ fill: "#71717a", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+              <Tooltip contentStyle={tooltipStyle} />
+              {hasReadiness && (
+                <Line type="monotone" dataKey="readiness" name="Readiness" stroke="#34d399" strokeWidth={2}
+                  dot={{ fill: "#34d399", r: 2, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} connectNulls />
+              )}
+              {hasSleep && (
+                <Line type="monotone" dataKey="sleep" name="Sleep" stroke="#818cf8" strokeWidth={2}
+                  dot={{ fill: "#818cf8", r: 2, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} connectNulls />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex gap-4 mt-2">
+            {hasReadiness && <span className="flex items-center gap-1.5 text-xs text-zinc-400"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />Readiness</span>}
+            {hasSleep && <span className="flex items-center gap-1.5 text-xs text-zinc-400"><span className="w-2.5 h-2.5 rounded-full bg-indigo-400 shrink-0" />Sleep</span>}
+          </div>
+        </div>
+      )}
+
+      {/* HRV */}
+      {hasHRV && (
+        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4">
+          <p className="text-xs text-zinc-500 mb-3">HRV (ms)</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
+              <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "#71717a", fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} ms`, "HRV"]} />
+              <Line type="monotone" dataKey="hrv" name="HRV" stroke="#f472b6" strokeWidth={2}
+                dot={{ fill: "#f472b6", r: 2, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Weight chart ────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
@@ -158,16 +239,18 @@ function formatDate(dateStr: string): string {
 
 export default function ProgressPage() {
   const [data, setData] = useState<ProgressData | null>(null);
+  const [trend, setTrend] = useState<TrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/progress")
-      .then((r) => r.json())
-      .then((d: ProgressData) => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch("/api/progress").then((r) => r.json()),
+      fetch("/api/wearables/oura/trend").then((r) => r.json()).catch(() => ({ trend: [] })),
+    ]).then(([progressData, trendData]: [ProgressData, { trend: TrendPoint[] }]) => {
+      setData(progressData);
+      setTrend(trendData.trend ?? []);
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -178,7 +261,7 @@ export default function ProgressPage() {
     );
   }
 
-  const hasData = (data?.exercises?.length ?? 0) > 0 || (data?.trainingDays?.length ?? 0) > 0;
+  const hasData = (data?.exercises?.length ?? 0) > 0 || (data?.trainingDays?.length ?? 0) > 0 || trend.length > 0;
 
   if (!hasData) {
     return (
@@ -200,6 +283,14 @@ export default function ProgressPage() {
           <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4">
             <FrequencyHeatmap trainingDays={data!.trainingDays} />
           </div>
+        </section>
+      )}
+
+      {/* Recovery trend (Oura) */}
+      {trend.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Recovery Trend — Last 28 Days</h2>
+          <RecoveryTrendChart trend={trend} />
         </section>
       )}
 

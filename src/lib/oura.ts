@@ -165,6 +165,50 @@ export async function fetchOuraData(userId: string, sessionDate?: string): Promi
   return { readiness, sleep, activity, fetchedAt: new Date().toISOString() };
 }
 
+export interface OuraTrendPoint {
+  date: string;
+  readiness: number | null;
+  sleep: number | null;
+  hrv: number | null;
+  restingHR: number | null;
+}
+
+/** Fetch daily readiness + sleep for the last `days` days (default 28). */
+export async function fetchOuraTrend(userId: string, days = 28): Promise<OuraTrendPoint[]> {
+  const token = await getValidToken(userId);
+  const end = dateString(new Date());
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+  const start = dateString(startDate);
+
+  const [readinessRes, sleepRes] = await Promise.allSettled([
+    ouraGet<{ data: OuraReadiness[] }>("daily_readiness", token, { start_date: start, end_date: end }),
+    ouraGet<{ data: OuraSleep[] }>("daily_sleep", token, { start_date: start, end_date: end }),
+  ]);
+
+  const readinessByDate = new Map<string, OuraReadiness>();
+  if (readinessRes.status === "fulfilled") {
+    for (const r of readinessRes.value.data) readinessByDate.set(r.date, r);
+  }
+
+  const sleepByDate = new Map<string, OuraSleep>();
+  if (sleepRes.status === "fulfilled") {
+    for (const s of sleepRes.value.data) sleepByDate.set(s.date, s);
+  }
+
+  // Build a point for every day in range that has at least one data source
+  const allDates = new Set([...readinessByDate.keys(), ...sleepByDate.keys()]);
+  return Array.from(allDates)
+    .sort()
+    .map((date) => ({
+      date,
+      readiness: readinessByDate.get(date)?.score ?? null,
+      sleep: sleepByDate.get(date)?.score ?? null,
+      hrv: sleepByDate.get(date)?.average_hrv ?? null,
+      restingHR: sleepByDate.get(date)?.average_heart_rate ?? null,
+    }));
+}
+
 export function formatOuraForLens(data: OuraData): string {
   const lines: string[] = ["## Oura Ring Data"];
 

@@ -6,6 +6,7 @@ import AuthProvider from "@/components/AuthProvider";
 import NavUser from "@/components/NavUser";
 import BottomNav from "@/components/BottomNav";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { InstallButton } from "@/components/InstallButton";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </Link>
             </div>
 
+            <InstallButton />
             <NavUser />
           </nav>
 
