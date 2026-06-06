@@ -5,6 +5,7 @@ import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
+import { checkRateLimit } from "@/lib/security";
 import type { AgentInput, SessionSummary, SessionImage } from "@/lib/agents/types";
 
 function toSessionSummary(s: {
@@ -53,6 +54,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const userId = authSession.user.id;
+
+    // Rate limit: max 15 analyses per user per hour (each burns 4–5 API calls)
+    const rateCheck = checkRateLimit(userId, "analyze", 15);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many analysis requests. Please wait before running another analysis." },
+        { status: 429 }
+      );
+    }
 
     const { sessionId } = (await req.json()) as { sessionId: number };
 

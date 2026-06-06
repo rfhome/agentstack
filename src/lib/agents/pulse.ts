@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { prisma } from "../prisma";
+import { wrapAgentInput, SECURITY_CANARY } from "../security";
 import type { AgentInput, AgentResponse } from "./types";
 
 const SYSTEM_PROMPT = `You are Pulse, a precision fitness analyst embedded in AgentStack. Analyze training sessions with rigorous attention to progressive overload, volume, intensity, and cycle structure. Speak in data and patterns. Track trends across sessions, flag plateaus, celebrate real PRs. Be direct and specific — never vague.
@@ -23,7 +24,7 @@ CRITICAL: Your entire response must be a single valid JSON object. Do not write 
   "flags": ["string"],
   "nextSession": "specific next session guidance as a plain string",
   "latencyMs": 0
-}`;
+}${SECURITY_CANARY}`;
 
 export async function runPulse(input: AgentInput): Promise<AgentResponse> {
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -31,7 +32,7 @@ export async function runPulse(input: AgentInput): Promise<AgentResponse> {
 
   // Exclude images from the JSON text prompt (passed separately as vision blocks)
   const { images, ...inputWithoutImages } = input;
-  const prompt = JSON.stringify(inputWithoutImages, null, 2);
+  const prompt = wrapAgentInput(JSON.stringify(inputWithoutImages, null, 2));
 
   type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   type ContentBlock =

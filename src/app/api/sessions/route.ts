@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { fetchOuraRecovery } from "@/lib/oura";
+import { detectInjectionInFields } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -66,6 +67,23 @@ export async function POST(req: NextRequest) {
       }[];
       images?: { data: string; mediaType: string; name: string }[];
     };
+
+    // Injection check — scan all user-supplied text fields before saving or sending to agents
+    const injectionFields: Record<string, string | null | undefined> = {
+      notes: session.notes,
+      ...Object.fromEntries((exercises ?? []).flatMap((e, i) => [
+        [`exercise_${i}_name`, e.name],
+        [`exercise_${i}_notes`, e.notes],
+      ])),
+      ...Object.fromEntries((cardioActivities ?? []).flatMap((c, i) => [
+        [`cardio_${i}_notes`, c.notes],
+      ])),
+    };
+    const injectedField = detectInjectionInFields(injectionFields);
+    if (injectedField) {
+      console.warn("[POST /api/sessions] Injection attempt detected", { userId: authSession.user.id, field: injectedField });
+      return NextResponse.json({ error: "Input contains disallowed content" }, { status: 400 });
+    }
 
     const sessionDate = session.date
       ? new Date(session.date).toISOString().split("T")[0]

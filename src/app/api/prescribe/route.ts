@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { getUserContext } from "@/lib/context/userProfile";
+import { detectInjection } from "@/lib/security";
 import OpenAI from "openai";
 
 const SYSTEM_PROMPT = `You are Forge, a strength program architect. Based on the user's recent training history, goals, and user context, prescribe a complete workout for their requested cycle day.
@@ -54,6 +55,11 @@ export async function GET(req: NextRequest) {
 
     const cycleDay = parseInt(req.nextUrl.searchParams.get("cycleDay") ?? "1");
     const workoutContext = req.nextUrl.searchParams.get("context") ?? "";
+
+    if (workoutContext && detectInjection(workoutContext)) {
+      console.warn("[GET /api/prescribe] Injection attempt in context param", { userId });
+      return NextResponse.json({ error: "Input contains disallowed content" }, { status: 400 });
+    }
 
     const [allRecentSessions, goals, userContext] = await withRLS(userId, (db) =>
       Promise.all([

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "../prisma";
+import { wrapAgentInput, SECURITY_CANARY } from "../security";
 import type { AgentInput, AgentResponse } from "./types";
 
 const SYSTEM_PROMPT = `You are Lens, a recovery and longevity specialist embedded in AgentStack. Analyze training through the lens of recovery quality, neurological health, and long-term resilience. Factor in sleep signals, session timing, and cardiovascular load. When Oura Ring data is present in the input (under "ouraContext"), treat it as the primary recovery signal — readiness score, HRV, sleep score, and temperature deviation should directly influence your analysis and flags. Flag when recovery may be insufficient and suggest longevity-focused adjustments. When Fitbit data is present (under "fitbitContext"), use it alongside Oura data to give a complete recovery + effort picture: Oura tells you how ready the athlete was going in; Fitbit tells you how hard they actually worked. Return only valid JSON matching this exact structure, no markdown, no preamble:
@@ -12,7 +13,7 @@ const SYSTEM_PROMPT = `You are Lens, a recovery and longevity specialist embedde
   "flags": ["string"],
   "nextSession": "string",
   "latencyMs": 0
-}`;
+}${SECURITY_CANARY}`;
 
 export async function runLens(input: AgentInput): Promise<AgentResponse> {
   const client = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -21,7 +22,7 @@ export async function runLens(input: AgentInput): Promise<AgentResponse> {
     systemInstruction: SYSTEM_PROMPT,
   });
   const start = Date.now();
-  const prompt = JSON.stringify(input, null, 2);
+  const prompt = wrapAgentInput(JSON.stringify(input, null, 2));
 
   const res = await model.generateContent(prompt);
   const latencyMs = Date.now() - start;

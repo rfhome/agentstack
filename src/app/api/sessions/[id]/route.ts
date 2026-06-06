@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { isValidRating } from "@/lib/agents/parse";
+import { detectInjectionInFields } from "@/lib/security";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -70,6 +71,23 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       }[];
       images?: { data: string; mediaType: string; name: string }[];
     };
+
+    // Injection check on all user-supplied text fields
+    const injectionFields: Record<string, string | null | undefined> = {
+      notes: session.notes,
+      ...Object.fromEntries((exercises ?? []).flatMap((e, i) => [
+        [`exercise_${i}_name`, e.name],
+        [`exercise_${i}_notes`, e.notes],
+      ])),
+      ...Object.fromEntries((cardioActivities ?? []).flatMap((c, i) => [
+        [`cardio_${i}_notes`, c.notes],
+      ])),
+    };
+    const injectedField = detectInjectionInFields(injectionFields);
+    if (injectedField) {
+      console.warn("[PUT /api/sessions/[id]] Injection attempt detected", { userId, sessionId, field: injectedField });
+      return NextResponse.json({ error: "Input contains disallowed content" }, { status: 400 });
+    }
 
     await withRLS(userId, async (db) => {
       // Verify ownership

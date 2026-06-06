@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
+import { detectInjection } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,12 @@ export async function PUT(req: NextRequest) {
 
     const userId = session.user.id;
     const { name, context } = (await req.json()) as { name: string; context: string };
+
+    // Injection check — profile context is passed verbatim to all agents as userContext
+    if (context && detectInjection(context)) {
+      console.warn("[PUT /api/profile] Injection attempt in context field", { userId });
+      return NextResponse.json({ error: "Input contains disallowed content" }, { status: 400 });
+    }
 
     await withRLS(userId, async (db) => {
       const existing = await db.userProfile.findFirst({ where: { userId } });

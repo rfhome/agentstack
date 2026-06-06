@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { prisma } from "../prisma";
+import { wrapAgentInput, SECURITY_CANARY } from "../security";
 import type { AgentInput, AgentResponse } from "./types";
 
 const SYSTEM_PROMPT = `You are Forge, a strength program architect embedded in AgentStack. Specialize in periodization, exercise selection, and prescribing the optimal next session. Think in cycles and phases. Tell the user exactly what weights, sets, and reps to target next time. Be prescriptive and specific.
@@ -16,12 +17,12 @@ Return only valid JSON matching this exact structure, no markdown, no preamble:
   "flags": ["string"],
   "nextSession": "string",
   "latencyMs": 0
-}`;
+}${SECURITY_CANARY}`;
 
 export async function runForge(input: AgentInput): Promise<AgentResponse> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const start = Date.now();
-  const prompt = JSON.stringify(input, null, 2);
+  const prompt = wrapAgentInput(JSON.stringify(input, null, 2));
 
   const res = await client.chat.completions.create({
     model: "gpt-4o",

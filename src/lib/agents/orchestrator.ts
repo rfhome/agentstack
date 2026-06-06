@@ -4,6 +4,7 @@ import { runPulse } from "./pulse";
 import { runForge } from "./forge";
 import { runLens } from "./lens";
 import { extractJSON, isValidRating } from "./parse";
+import { wrapNexusInput, detectOutputLeak, SECURITY_CANARY } from "../security";
 import type { AgentInput, AgentResponse, OrchestratorResult } from "./types";
 
 const NEXUS_SYSTEM_PROMPT = `You are Nexus, the master orchestrator of AgentStack. You receive analysis from three specialized agents — Pulse (fitness analyst), Forge (program architect), and Lens (recovery & longevity specialist) — and synthesize their findings into a single unified recommendation.
@@ -21,7 +22,7 @@ Return only valid JSON with this exact structure, no markdown, no preamble:
   "nextActions": ["string", "string", "string"],
   "suggestedRating": "A" | "B" | "C",
   "ratingReason": "string — one sentence explaining the rating"
-}`;
+}${SECURITY_CANARY}`;
 
 export async function runOrchestrator(input: AgentInput): Promise<OrchestratorResult> {
   // Fan out to all 3 agents in parallel (Lens may fail if Gemini billing not set up)
@@ -42,7 +43,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
   // Send all agent responses to Nexus for synthesis
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const start = Date.now();
-  const nexusPrompt = JSON.stringify({ agentResponses, sessionContext: input.sessionData }, null, 2);
+  const nexusPrompt = wrapNexusInput(JSON.stringify({ agentResponses, sessionContext: input.sessionData }, null, 2));
 
   type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   type ContentBlock =
@@ -70,6 +71,9 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
   const latencyMs = Date.now() - start;
   const text = (msg.content[0] as { type: string; text: string }).text;
 
+  // Scan output for signs of system-internal leakage before storing or returning
+  const leakDetected = detectOutputLeak(text);
+
   const synthesis = extractJSON<{
     content: string;
     nextActions: string[];
@@ -90,10 +94,22 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
     },
   });
 
+  // If leak detected, log a warning but surface a safe placeholder to the user
+  const safeContent = leakDetected
+    ? "Analysis complete. Review individual agent outputs for details."
+    : synthesis.content;
+
+  if (leakDetected) {
+    console.warn("[Nexus] Output leak pattern detected — redacted from recommendation", {
+      userId: input.userId,
+      sessionId: input.sessionId,
+    });
+  }
+
   await prisma.recommendation.create({
     data: {
       domain: "fitness",
-      content: synthesis.content,
+      content: safeContent,
       nextActions: synthesis.nextActions,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       ...(input.userId ? { userId: input.userId } : {}),
@@ -105,7 +121,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
     : undefined;
 
   return {
-    recommendation: { content: synthesis.content, nextActions: synthesis.nextActions },
+    recommendation: { content: safeContent, nextActions: synthesis.nextActions },
     agentResponses,
     suggestedRating,
     ratingReason: synthesis.ratingReason,
