@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { detectInjection } from "@/lib/security";
 
@@ -13,13 +14,17 @@ export async function GET() {
     }
 
     const userId = session.user.id;
-    const profile = await withRLS(userId, (db) => db.userProfile.findFirst({ where: { userId } }));
+    const [profile, user] = await Promise.all([
+      withRLS(userId, (db) => db.userProfile.findFirst({ where: { userId } })),
+      prisma.user.findUnique({ where: { id: userId }, select: { tier: true } }),
+    ]);
 
     return NextResponse.json({
       name: profile?.name ?? "",
       context: profile?.context ?? "",
       programConfig: profile?.programConfig ?? null,
       onboardingComplete: profile?.onboardingComplete ?? false,
+      tier: user?.tier ?? "free",
     });
   } catch (err) {
     console.error("[GET /api/profile]", err);

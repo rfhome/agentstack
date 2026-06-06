@@ -32,7 +32,7 @@ export default function SignUpPage() {
     }
 
     await signIn("credentials", { email, password, redirect: false });
-    window.location.href = "/fitness";
+    window.location.href = "/onboarding";
   }
 
   return (

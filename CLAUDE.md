@@ -42,6 +42,16 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - `GET /api/stats` returns `StreakStats + goalsAchieved`; queries all session dates + achieved goal count
 - `StreaksCard` component fetches `/api/stats` on mount and renders a 2×2/4-col stat grid
 
+### Access tiers + promo codes
+- `User.tier String @default("free")` — values: `"free"` | `"beta"` | `"premium"`
+- `PromoCode` model: `code String @unique`, `tier`, `maxUses`, `usedCount`, `expiresAt?`
+- `POST /api/redeem` — validates code, checks not expired/overused, upgrades user tier atomically
+- Tier exposed via `GET /api/profile` → `{ tier }` field
+- Settings page shows current tier badge + redeem code form (only when `tier === "free"`)
+- Create codes via Railway SQL: `INSERT INTO "PromoCode" (code, tier, "maxUses") VALUES ('YOURCODE', 'beta', 50);`
+- Gate premium features: `if (profile.tier === "free") return <UpgradeCTA />`
+- New users signing up via credentials are redirected to `/onboarding` (not `/fitness`)
+
 ### Security
 - All user-supplied text is scanned with `detectInjection()` / `detectInjectionInFields()` from `src/lib/security.ts` before saving or forwarding to agents
 - Agent inputs are wrapped in XML delimiters via `wrapAgentInput()` / `wrapNexusInput()`

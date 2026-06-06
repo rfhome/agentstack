@@ -11,6 +11,7 @@ model User {
   name            String?
   email           String           @unique
   password        String?
+  tier            String           @default("free") // "free" | "beta" | "premium"
   accounts        Account[]
   workouts        Session[]
   goals           Goal[]
@@ -19,6 +20,16 @@ model User {
   profile         UserProfile?
   wearables       WearableConnection[]
   createdAt       DateTime         @default(now())
+}
+
+model PromoCode {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique
+  tier      String    @default("beta")  // tier granted on redemption
+  maxUses   Int       @default(100)
+  usedCount Int       @default(0)
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
 }
 
 model Account {

@@ -34,6 +34,10 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [ouraStatus, setOuraStatus] = useState<OuraStatus | null>(null);
   const [fitbitStatus, setFitbitStatus] = useState<FitbitStatus | null>(null);
+  const [tier, setTier] = useState<string>("free");
+  const [promoCode, setPromoCode] = useState("");
+  const [redeemState, setRedeemState] = useState<"idle" | "loading" | "success" | "error">("idle");
+  const [redeemMsg, setRedeemMsg] = useState("");
   const oauthError = searchParams.get("error");
 
   useEffect(() => {
@@ -43,7 +47,37 @@ function SettingsContent() {
     fetch("/api/wearables/fitbit")
       .then((r) => r.json())
       .then(setFitbitStatus);
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((p: { tier?: string }) => { if (p.tier) setTier(p.tier); });
   }, []);
+
+  async function handleRedeem() {
+    const code = promoCode.trim();
+    if (!code) return;
+    setRedeemState("loading");
+    setRedeemMsg("");
+    try {
+      const res = await fetch("/api/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code }),
+      });
+      const data = (await res.json()) as { tier?: string; error?: string };
+      if (!res.ok) {
+        setRedeemState("error");
+        setRedeemMsg(data.error ?? "Redemption failed");
+      } else {
+        setRedeemState("success");
+        setTier(data.tier ?? tier);
+        setRedeemMsg(`Access upgraded to ${data.tier ?? "beta"}`);
+        setPromoCode("");
+      }
+    } catch {
+      setRedeemState("error");
+      setRedeemMsg("Something went wrong");
+    }
+  }
 
   async function disconnectOura() {
     await fetch("/api/wearables/oura", { method: "DELETE" });
@@ -203,6 +237,59 @@ function SettingsContent() {
               Connect Fitbit
             </a>
           </div>
+        )}
+      </section>
+
+      {/* Access tier */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-medium text-white">Access</h2>
+          {tier === "free" && (
+            <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full">Free</span>
+          )}
+          {tier === "beta" && (
+            <span className="text-xs bg-violet-900/40 text-violet-300 px-2 py-0.5 rounded-full">Beta</span>
+          )}
+          {tier === "premium" && (
+            <span className="text-xs bg-amber-900/40 text-amber-300 px-2 py-0.5 rounded-full">Premium</span>
+          )}
+        </div>
+
+        {tier === "free" && (
+          <div className="space-y-3">
+            <p className="text-sm text-zinc-400">
+              Have an invite code? Enter it below to unlock beta features.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === "Enter" && handleRedeem()}
+                placeholder="ENTER CODE"
+                className="flex-1 rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 uppercase tracking-widest focus:outline-none focus:border-zinc-600"
+                maxLength={24}
+              />
+              <button
+                onClick={handleRedeem}
+                disabled={redeemState === "loading" || !promoCode.trim()}
+                className="rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {redeemState === "loading" ? "..." : "Redeem"}
+              </button>
+            </div>
+            {redeemMsg && (
+              <p className={`text-sm ${redeemState === "success" ? "text-emerald-400" : "text-red-400"}`}>
+                {redeemMsg}
+              </p>
+            )}
+          </div>
+        )}
+
+        {tier !== "free" && (
+          <p className="text-sm text-zinc-400">
+            You have {tier} access. New features will be unlocked as they ship.
+          </p>
         )}
       </section>
     </div>

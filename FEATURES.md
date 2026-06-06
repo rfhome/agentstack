@@ -75,7 +75,11 @@
 ### Productization (Phase 2 — Retention)
 - [x] **Streaks card** — `StreaksCard` on fitness dashboard: current week streak, this-week vs last-week delta, total sessions, goals achieved; computed by `computeStreaks()` in `src/lib/streaks.ts`; `GET /api/stats` returns stats
 - [x] **Weekly summary** — `WeeklySummary` client component on fitness dashboard; `POST /api/weekly-summary` calls Nexus (Claude Sonnet) with this/prev week sessions + Oura recovery data; stored as `domain="weekly"` Recommendation; user triggers on demand; uses `extractJSON` + `wrapAgentInput` + `SECURITY_CANARY`
-- [ ] **Progress visualization** — workout frequency heatmap, recovery trend chart, personal records timeline
+- [x] **Progress page enhancements** — workout frequency heatmap (52-week GitHub-style grid), personal records summary (all-time max weight per exercise), weight-over-time charts; `GET /api/progress` now returns `{ exercises, prs, trainingDays }`
+- [x] **Access tiers + promo codes** — `User.tier` (`free`/`beta`/`premium`), `PromoCode` model, `POST /api/redeem`, tier badge + redeem UI on Settings; create codes via Railway SQL
+- [x] **Multi-user readiness** — no hardcoded user assumptions; new credential signups redirect to `/onboarding`; empty states handled across all dashboard components; data fully scoped by `userId`
+- [ ] **Wearable setup UX in onboarding** — guided OAuth flow as a paid/beta feature (gated behind `tier !== "free"`)
+- [ ] **Progress visualization** — recovery trend chart
 - [ ] **Notifications / digest** — "Your next workout is tomorrow — here's what Forge prescribes" as email or push
 
 ### Phase 3 — Beyond fitness
