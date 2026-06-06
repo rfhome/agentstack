@@ -108,25 +108,32 @@ Receives all fulfilled agent responses plus session context. Resolves conflicts,
 ```json
 {
   "content": "2–4 sentence synthesis paragraph",
-  "nextActions": ["string", "string", "string"]
+  "nextActions": ["string", "string", "string"],
+  "suggestedRating": "A" | "B" | "C",
+  "ratingReason": "one sentence explaining the rating"
 }
 ```
 
-Stored as a `Recommendation` record linked to the session.
+Stored as a `Recommendation` record linked to the session. The `suggestedRating` is surfaced to the user after analysis — they can accept it or pick a different one, which triggers a `PATCH /api/sessions/:id` to save the rating.
 
 ---
 
 ## JSON parsing
 
-All agents are instructed to return raw JSON (no markdown fences). All three parsers apply a layered extraction strategy in case a model wraps output in fences anyway:
+All agents are instructed to return raw JSON (no markdown fences). All parsers use the shared `extractJSON<T>()` utility in `src/lib/agents/parse.ts`, which applies a layered extraction strategy:
 
 ```typescript
-const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-const objectMatch = text.match(/(\{[\s\S]*\})/);
-const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
+// src/lib/agents/parse.ts
+export function extractJSON<T>(text: string, fallback: T): T {
+  const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
+  const objectMatch = text.match(/(\{[\s\S]*\})/);
+  const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
+  try { return JSON.parse(clean) as T; }
+  catch { return fallback; }
+}
 ```
 
-On parse failure, the raw text is stored as `analysis` with a flag.
+On parse failure, the raw text is stored as `analysis` with a flag. `isValidRating()` from the same file validates A/B/C rating values.
 
 ---
 

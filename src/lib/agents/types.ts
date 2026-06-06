@@ -59,4 +59,6 @@ export interface OrchestratorResult {
     nextActions: string[];
   };
   agentResponses: AgentResponse[];
+  suggestedRating?: "A" | "B" | "C";
+  ratingReason?: string;
 }

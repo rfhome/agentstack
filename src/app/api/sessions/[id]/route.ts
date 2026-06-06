@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
+import { isValidRating } from "@/lib/agents/parse";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -97,5 +98,29 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   } catch (err) {
     console.error("[PUT /api/sessions/[id]]", err);
     return NextResponse.json({ error: "Failed to update session" }, { status: 500 });
+  }
+}
+
+// PATCH — lightweight update for rating only (used by agent-suggested rating flow)
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const authSession = await auth();
+    if (!authSession?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const userId = authSession.user.id;
+    const { id } = await params;
+    const sessionId = parseInt(id);
+    if (isNaN(sessionId)) return NextResponse.json({ error: "Invalid id" }, { status: 400 });
+
+    const { rating } = await req.json() as { rating: string };
+    if (!isValidRating(rating)) return NextResponse.json({ error: "Rating must be A, B, or C" }, { status: 400 });
+
+    await withRLS(userId, (db) =>
+      db.session.update({ where: { id: sessionId, userId }, data: { rating } })
+    );
+
+    return NextResponse.json({ sessionId, rating });
+  } catch (err) {
+    console.error("[PATCH /api/sessions/[id]]", err);
+    return NextResponse.json({ error: "Failed to update rating" }, { status: 500 });
   }
 }

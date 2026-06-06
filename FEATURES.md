@@ -7,15 +7,18 @@
 - [x] Exercise logging — name, sets, reps per-set string, per-set weights string, notes
 - [x] Save-only (no analysis) vs Save & Analyze
 - [x] Workout prescription — "Get Workout" fetches AI-generated session plan based on cycle day and profile
+- [x] Pre-workout context field — free-text input passed to Forge before generating the plan (e.g. "golfing tomorrow", "left knee sore")
 - [x] Warmup and finisher checklists on log page (populated from prescription)
 - [x] X button clears exercise name; trash icon removes the row
+- [x] Session notes visible in History card (expanded view)
 
 ### Multi-agent analysis
 - [x] Pulse (Claude Sonnet) — progressive overload, per-exercise breakdown, HR zone analysis
 - [x] Forge (GPT-4o) — next-session prescription with specific weights/sets/reps
 - [x] Lens (Gemini 2.5 Flash) — recovery, longevity, Oura + Fitbit context
-- [x] Nexus (Claude Sonnet) — synthesis of all three agents into one recommendation
+- [x] Nexus (Claude Sonnet) — synthesis + agent-suggested session rating (A/B/C) with one-line reason
 - [x] All agent logs stored per session; robust JSON fence extraction prevents parse failures
+- [x] Suggested rating shown after analysis — user can accept or override before it's saved
 
 ### Auth
 - [x] Email + password sign-up / sign-in

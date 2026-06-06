@@ -25,9 +25,16 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 
 ### Agents
 - Agent files: `src/lib/agents/pulse.ts`, `forge.ts`, `lens.ts`, `orchestrator.ts`
-- All agents return JSON. Use the fence-extraction pattern (see AGENTS.md) for robust parsing
+- All agents return JSON. Use `extractJSON<T>()` from `src/lib/agents/parse.ts` — do not inline the fence-extraction pattern
 - `weights` (String?) is the source of truth for per-set load — not `weightLbs` (legacy, often 0)
 - Add `fitbitContext` and `ouraContext` as optional fields when extending AgentInput
+- Nexus returns `suggestedRating` ("A"|"B"|"C") and `ratingReason` — validated with `isValidRating()`
+
+### Tests
+- Framework: Vitest (`npm test` / `npm run test:watch`)
+- Test files: `src/**/*.test.ts`
+- Tests live in `__tests__/` subdirectory next to the code they test
+- Do not import Prisma, Next.js, or API routes in unit tests — test pure logic only
 
 ### Wearables
 - Token refresh logic lives in `src/lib/oura.ts` and `src/lib/fitbit.ts`

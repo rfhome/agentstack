@@ -24,6 +24,8 @@ type AgentResponse = {
 type AnalysisResult = {
   recommendation: { content: string; nextActions: string[] };
   agentResponses: AgentResponse[];
+  suggestedRating?: "A" | "B" | "C";
+  ratingReason?: string;
 };
 type Prescription = {
   cycleLabel: string;
@@ -85,6 +87,7 @@ export default function LogSessionPage() {
   const [fillingFitbit, setFillingFitbit] = useState(false);
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
+  const [workoutContext, setWorkoutContext] = useState("");
   const [images, setImages] = useState<{ data: string; mediaType: string; name: string }[]>([]);
   const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done" | "saved">("idle");
   const [analyzeStep, setAnalyzeStep] = useState(0);
@@ -223,7 +226,9 @@ export default function LogSessionPage() {
     setLoadingWorkout(true);
     setPrescription(null);
     try {
-      const res = await fetch(`/api/prescribe?cycleDay=${cycleDay}`);
+      const params = new URLSearchParams({ cycleDay });
+      if (workoutContext.trim()) params.set("context", workoutContext.trim());
+      const res = await fetch(`/api/prescribe?${params}`);
       const data: Prescription = await res.json();
       if (data.exercises?.length) {
         setExercises(
@@ -341,12 +346,75 @@ export default function LogSessionPage() {
   }
 
   if (step === "done" && result) {
+    const RATING_COLORS: Record<string, string> = {
+      A: "bg-emerald-900/40 border-emerald-700 text-emerald-300",
+      B: "bg-amber-900/40 border-amber-700 text-amber-300",
+      C: "bg-red-900/40 border-red-700 text-red-300",
+    };
+    const [acceptedRating, setAcceptedRating] = useState<string | null>(rating || null);
+    const [savingRating, setSavingRating] = useState(false);
+
+    async function applyRating(r: string) {
+      if (!savedSessionId) return;
+      setSavingRating(true);
+      try {
+        await fetch(`/api/sessions/${savedSessionId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rating: r }),
+        });
+        setAcceptedRating(r);
+        setRating(r);
+      } finally {
+        setSavingRating(false);
+      }
+    }
+
     return (
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-white">Analysis Complete</h1>
           <p className="text-sm text-zinc-500">Nexus has reviewed your session.</p>
         </div>
+
+        {/* Suggested rating */}
+        {result.suggestedRating && !acceptedRating && (
+          <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-4 space-y-3">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Agents suggest a rating</p>
+            <div className="flex items-center gap-3">
+              <span className={`text-2xl font-bold px-3 py-1 rounded-lg border ${RATING_COLORS[result.suggestedRating]}`}>
+                {result.suggestedRating}
+              </span>
+              <p className="text-sm text-zinc-300">{result.ratingReason}</p>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => applyRating(result.suggestedRating!)}
+                disabled={savingRating}
+                className="flex-1 rounded-lg bg-white text-zinc-950 py-2 text-sm font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
+              >
+                Accept {result.suggestedRating}
+              </button>
+              {(["A", "B", "C"] as const).filter(r => r !== result.suggestedRating).map(r => (
+                <button
+                  key={r}
+                  onClick={() => applyRating(r)}
+                  disabled={savingRating}
+                  className="rounded-lg border border-zinc-700 bg-zinc-800 text-zinc-300 hover:text-white px-4 py-2 text-sm font-semibold transition-colors disabled:opacity-50"
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {acceptedRating && (
+          <div className={`rounded-xl border p-3 flex items-center gap-3 ${RATING_COLORS[acceptedRating]}`}>
+            <span className="text-xl font-bold">{acceptedRating}</span>
+            <span className="text-sm">Session rated</span>
+          </div>
+        )}
 
         {/* Nexus synthesis */}
         <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-3">
@@ -628,7 +696,7 @@ export default function LogSessionPage() {
 
         {/* Exercises */}
         <div>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Exercises</h2>
             <button type="button" onClick={handleGetWorkout} disabled={loadingWorkout}
               className="flex items-center gap-1.5 rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50">
@@ -638,6 +706,15 @@ export default function LogSessionPage() {
                 <><span>⚡</span> Get Workout</>
               )}
             </button>
+          </div>
+          <div className="mb-3">
+            <input
+              type="text"
+              value={workoutContext}
+              onChange={(e) => setWorkoutContext(e.target.value)}
+              placeholder="Any context for today? e.g. 'going golfing tomorrow' or 'left knee a bit sore'"
+              className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+            />
           </div>
           <div className="space-y-2">
             {exercises.map((ex, i) => (

@@ -38,7 +38,9 @@ Return only valid JSON with this exact structure, no markdown, no preamble:
   "todaysGoal": "1-2 sentences on the session intention — not max effort, focus on quality"
 }
 
-The "weights" field is per-set weights as a comma-separated string. Use progressive loading when appropriate. Base prescriptions on the user's actual recent history and goals. For the warm-up, always include 2-3 dynamic movements relevant to the day's muscle groups.`;
+The "weights" field is per-set weights as a comma-separated string. Use progressive loading when appropriate. Base prescriptions on the user's actual recent history and goals. For the warm-up, always include 2-3 dynamic movements relevant to the day's muscle groups.
+
+If a "todayContext" field is present in the input, treat it as important athlete-provided context that should influence the prescription — e.g. if they mention golfing tomorrow, reduce lower-body fatigue; if they mention a sore joint, avoid loading that area; if they mention a time constraint, tighten the session.`;
 
 const CYCLE_LABELS: Record<number, string> = { 1: "Push", 2: "Pull", 3: "Legs", 4: "Arms" };
 
@@ -51,6 +53,7 @@ export async function GET(req: NextRequest) {
     const userId = session.user.id;
 
     const cycleDay = parseInt(req.nextUrl.searchParams.get("cycleDay") ?? "1");
+    const workoutContext = req.nextUrl.searchParams.get("context") ?? "";
 
     const [allRecentSessions, goals, userContext] = await withRLS(userId, (db) =>
       Promise.all([
@@ -95,6 +98,7 @@ export async function GET(req: NextRequest) {
         targetReps: g.targetReps,
       })),
       userContext,
+      ...(workoutContext ? { todayContext: workoutContext } : {}),
     }, null, 2);
 
     const res = await client.chat.completions.create({

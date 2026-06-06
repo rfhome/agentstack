@@ -171,6 +171,11 @@ export function SessionHistoryCard({ session }: { session: Session }) {
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-zinc-800 pt-4">
+          {/* Session notes */}
+          {session.notes && (
+            <p className="text-sm text-zinc-400 italic leading-relaxed">{session.notes}</p>
+          )}
+
           {session.exercises.length > 0 && (
             <div className="space-y-1">
               {session.exercises.map((ex) => (

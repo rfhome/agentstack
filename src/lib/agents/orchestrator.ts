@@ -3,16 +3,24 @@ import { prisma } from "../prisma";
 import { runPulse } from "./pulse";
 import { runForge } from "./forge";
 import { runLens } from "./lens";
+import { extractJSON, isValidRating } from "./parse";
 import type { AgentInput, AgentResponse, OrchestratorResult } from "./types";
 
 const NEXUS_SYSTEM_PROMPT = `You are Nexus, the master orchestrator of AgentStack. You receive analysis from three specialized agents — Pulse (fitness analyst), Forge (program architect), and Lens (recovery & longevity specialist) — and synthesize their findings into a single unified recommendation.
 
 Resolve conflicts between agents, weigh each perspective appropriately, and deliver one clear, actionable recommendation. Be direct. Prioritize what matters most for today and the next session.
 
+Also suggest a session rating based on the overall quality of the session:
+- A: Excellent — strong performance, good HR response, progressed load or volume, well recovered
+- B: Solid — adequate performance, minor flags (slightly elevated HR, small regression, minor fatigue)
+- C: Tough — significant fatigue, regression, poor recovery, or injury flags
+
 Return only valid JSON with this exact structure, no markdown, no preamble:
 {
   "content": "string — 2-4 sentence synthesis paragraph",
-  "nextActions": ["string", "string", "string"]
+  "nextActions": ["string", "string", "string"],
+  "suggestedRating": "A" | "B" | "C",
+  "ratingReason": "string — one sentence explaining the rating"
 }`;
 
 export async function runOrchestrator(input: AgentInput): Promise<OrchestratorResult> {
@@ -61,16 +69,13 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
 
   const latencyMs = Date.now() - start;
   const text = (msg.content[0] as { type: string; text: string }).text;
-  const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-  const objectMatch = text.match(/(\{[\s\S]*\})/);
-  const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
 
-  let synthesis: { content: string; nextActions: string[] };
-  try {
-    synthesis = JSON.parse(clean);
-  } catch {
-    synthesis = { content: text, nextActions: [] };
-  }
+  const synthesis = extractJSON<{
+    content: string;
+    nextActions: string[];
+    suggestedRating?: string;
+    ratingReason?: string;
+  }>(text, { content: text, nextActions: [] });
 
   await prisma.agentLog.create({
     data: {
@@ -85,7 +90,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
     },
   });
 
-  const recommendation = await prisma.recommendation.create({
+  await prisma.recommendation.create({
     data: {
       domain: "fitness",
       content: synthesis.content,
@@ -95,10 +100,14 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
     },
   });
 
-  void recommendation;
+  const suggestedRating = isValidRating(synthesis.suggestedRating)
+    ? synthesis.suggestedRating
+    : undefined;
 
   return {
-    recommendation: synthesis,
+    recommendation: { content: synthesis.content, nextActions: synthesis.nextActions },
     agentResponses,
+    suggestedRating,
+    ratingReason: synthesis.ratingReason,
   };
 }
