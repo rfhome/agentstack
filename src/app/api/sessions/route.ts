@@ -7,16 +7,24 @@ import { detectInjectionInFields } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const cycleDayParam = req.nextUrl.searchParams.get("cycleDay");
+    const limitParam = req.nextUrl.searchParams.get("limit");
+    const cycleDay = cycleDayParam ? parseInt(cycleDayParam) : null;
+    const limit = limitParam ? Math.min(parseInt(limitParam), 20) : 10;
+
     const sessions = await withRLS(session.user.id, (db) => db.session.findMany({
-      where: { userId: session.user.id },
-      take: 10,
+      where: {
+        userId: session.user.id,
+        ...(cycleDay != null && !isNaN(cycleDay) ? { cycleDay } : {}),
+      },
+      take: limit,
       orderBy: { date: "desc" },
       include: { exercises: true },
     }));

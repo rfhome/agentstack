@@ -39,6 +39,17 @@ type Prescription = {
 
 const ANALYZING_STEPS = ["Pulse analyzing...", "Forge reviewing...", "Nexus synthesizing..."];
 const DRAFT_KEY = "log-draft";
+const CYCLE_LABELS: Record<string, string> = { "1": "Push", "2": "Pull", "3": "Legs", "4": "Arms" };
+
+// Appends a new weight to a comma-separated weights string, incrementing the last value.
+// e.g. appendWeight("95,95", 5) → "95,95,100"
+function appendWeight(current: string, delta: number): string {
+  const parts = current.trim().split(",").map(s => s.trim()).filter(Boolean);
+  if (parts.length === 0) return String(delta);
+  const last = parseFloat(parts[parts.length - 1]);
+  if (isNaN(last)) return current;
+  return [...parts, String(Math.round((last + delta) * 10) / 10)].join(",");
+}
 
 type Draft = {
   savedAt: string;
@@ -93,6 +104,14 @@ export default function LogSessionPage() {
   const [analyzeStep, setAnalyzeStep] = useState(0);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
+
+  // Template loading
+  const [loadingTemplate, setLoadingTemplate] = useState(false);
+  const [templateDate, setTemplateDate] = useState<string | null>(null);
+
+  // Agent-suggested rating (top-level to satisfy React hooks rules)
+  const [acceptedRating, setAcceptedRating] = useState<string | null>(null);
+  const [savingRating, setSavingRating] = useState(false);
 
   // Load existing session when opened via ?edit=ID
   useEffect(() => {
@@ -345,14 +364,43 @@ export default function LogSessionPage() {
     }
   }
 
+  async function handleUseTemplate() {
+    setLoadingTemplate(true);
+    setTemplateDate(null);
+    try {
+      const res = await fetch(`/api/sessions?cycleDay=${cycleDay}&limit=1`);
+      if (!res.ok) return;
+      const sessions = await res.json();
+      if (sessions?.length && sessions[0].exercises?.length) {
+        const s = sessions[0];
+        setExercises(
+          s.exercises.map((e: { name: string; sets: number | null; reps: string | null; weights: string | null }) => ({
+            name: e.name ?? "",
+            sets: e.sets != null ? String(e.sets) : "",
+            reps: e.reps ?? "",
+            weights: e.weights ?? "",
+            notes: "",
+          }))
+        );
+        setTemplateDate(
+          new Date(s.date).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+        );
+      }
+    } catch { /* silent — user fills in manually */ }
+    finally {
+      setLoadingTemplate(false);
+    }
+  }
+
   if (step === "done" && result) {
     const RATING_COLORS: Record<string, string> = {
       A: "bg-emerald-900/40 border-emerald-700 text-emerald-300",
       B: "bg-amber-900/40 border-amber-700 text-amber-300",
       C: "bg-red-900/40 border-red-700 text-red-300",
     };
-    const [acceptedRating, setAcceptedRating] = useState<string | null>(rating || null);
-    const [savingRating, setSavingRating] = useState(false);
+    // acceptedRating and savingRating are declared at the top level of this component.
+    // Use `rating` (pre-existing) as initial display value if no new rating chosen yet.
+    const displayRating = acceptedRating ?? rating ?? null;
 
     async function applyRating(r: string) {
       if (!savedSessionId) return;
@@ -378,7 +426,7 @@ export default function LogSessionPage() {
         </div>
 
         {/* Suggested rating */}
-        {result.suggestedRating && !acceptedRating && (
+        {result.suggestedRating && !displayRating && (
           <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-4 space-y-3">
             <p className="text-xs text-zinc-500 uppercase tracking-wide">Agents suggest a rating</p>
             <div className="flex items-center gap-3">
@@ -409,9 +457,9 @@ export default function LogSessionPage() {
           </div>
         )}
 
-        {acceptedRating && (
-          <div className={`rounded-xl border p-3 flex items-center gap-3 ${RATING_COLORS[acceptedRating]}`}>
-            <span className="text-xl font-bold">{acceptedRating}</span>
+        {displayRating && (
+          <div className={`rounded-xl border p-3 flex items-center gap-3 ${RATING_COLORS[displayRating]}`}>
+            <span className="text-xl font-bold">{displayRating}</span>
             <span className="text-sm">Session rated</span>
           </div>
         )}
@@ -698,15 +746,46 @@ export default function LogSessionPage() {
         <div>
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Exercises</h2>
-            <button type="button" onClick={handleGetWorkout} disabled={loadingWorkout}
-              className="flex items-center gap-1.5 rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50">
-              {loadingWorkout ? (
-                <><span className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" /> Loading...</>
-              ) : (
-                <><span>⚡</span> Get Workout</>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleUseTemplate}
+                disabled={loadingTemplate}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50"
+              >
+                {loadingTemplate ? (
+                  <><span className="w-3 h-3 border border-zinc-600 border-t-zinc-300 rounded-full animate-spin" /> Loading...</>
+                ) : (
+                  <>Last {CYCLE_LABELS[cycleDay] ?? `Day ${cycleDay}`}</>
+                )}
+              </button>
+              <button type="button" onClick={handleGetWorkout} disabled={loadingWorkout}
+                className="flex items-center gap-1.5 rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50">
+                {loadingWorkout ? (
+                  <><span className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" /> Loading...</>
+                ) : (
+                  <><span>⚡</span> Get Workout</>
+                )}
+              </button>
+            </div>
           </div>
+
+          {/* Template loaded banner */}
+          {templateDate && (
+            <div className="flex items-center justify-between rounded-lg bg-zinc-800/60 border border-zinc-700 px-3 py-2 mb-3">
+              <p className="text-xs text-zinc-400">
+                Loaded from <span className="text-zinc-200">{templateDate}</span> — adjust weights for today
+              </p>
+              <button
+                type="button"
+                onClick={() => { setExercises([emptyExercise()]); setTemplateDate(null); }}
+                className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors ml-3 shrink-0"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           <div className="mb-3">
             <input
               type="text"
@@ -718,20 +797,21 @@ export default function LogSessionPage() {
           </div>
           <div className="space-y-2">
             {exercises.map((ex, i) => (
-              <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2">
+              <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2.5">
+                {/* Row 1: name + delete */}
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1">
                     <input
                       value={ex.name}
                       onChange={(e) => updateExercise(i, "name", e.target.value)}
                       placeholder="Exercise name"
-                      className="w-full rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 pr-7 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                      className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 pr-8 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
                     />
                     {ex.name && (
                       <button
                         type="button"
                         onClick={() => updateExercise(i, "name", "")}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs leading-none"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 text-xs leading-none"
                         tabIndex={-1}
                       >
                         ✕
@@ -741,7 +821,7 @@ export default function LogSessionPage() {
                   <button
                     type="button"
                     onClick={() => deleteExercise(i)}
-                    className="text-zinc-700 hover:text-red-500 transition-colors px-1 shrink-0"
+                    className="text-zinc-700 hover:text-red-500 transition-colors p-1.5 shrink-0 min-w-[36px] flex items-center justify-center"
                     title="Remove exercise"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
@@ -749,17 +829,47 @@ export default function LogSessionPage() {
                     </svg>
                   </button>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <input value={ex.sets} onChange={(e) => updateExercise(i, "sets", e.target.value)}
-                    placeholder="Sets" type="number" min="1"
-                    className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
-                  <input value={ex.reps} onChange={(e) => updateExercise(i, "reps", e.target.value)}
-                    placeholder="8,8,8,6"
-                    className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
-                  <input value={ex.weights} onChange={(e) => updateExercise(i, "weights", e.target.value)}
-                    placeholder="45,45,50"
-                    className="rounded bg-zinc-800 border border-zinc-700 px-2 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+
+                {/* Row 2: sets + reps */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-zinc-600 mb-1">Sets</label>
+                    <input value={ex.sets} onChange={(e) => updateExercise(i, "sets", e.target.value)}
+                      placeholder="4" type="number" min="1"
+                      className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-zinc-600 mb-1">Reps</label>
+                    <input value={ex.reps} onChange={(e) => updateExercise(i, "reps", e.target.value)}
+                      placeholder="8,8,8,6"
+                      className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
+                  </div>
                 </div>
+
+                {/* Row 3: weights + quick-add buttons */}
+                <div>
+                  <label className="block text-xs text-zinc-600 mb-1">Weights (lbs per set)</label>
+                  <div className="flex gap-2">
+                    <input
+                      value={ex.weights}
+                      onChange={(e) => updateExercise(i, "weights", e.target.value)}
+                      placeholder="95,95,100"
+                      className="flex-1 rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
+                    />
+                    {[2.5, 5, 10].map((delta) => (
+                      <button
+                        key={delta}
+                        type="button"
+                        onClick={() => updateExercise(i, "weights", appendWeight(ex.weights, delta))}
+                        className="shrink-0 rounded bg-zinc-800 border border-zinc-700 px-2.5 py-2.5 text-xs font-medium text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors min-w-[44px]"
+                        title={`Add ${delta} lbs to last set`}
+                      >
+                        +{delta}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {ex.notes && (
                   <p className="text-xs text-zinc-500 italic px-0.5">{ex.notes}</p>
                 )}
