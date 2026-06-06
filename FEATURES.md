@@ -11,6 +11,9 @@
 - [x] Warmup and finisher checklists on log page (populated from prescription)
 - [x] X button clears exercise name; trash icon removes the row
 - [x] Session notes visible in History card (expanded view)
+- [x] Session template — "Last Push/Pull/Legs/Arms" button pre-fills exercises + weights from most recent matching session
+- [x] Weight quick-add buttons — +2.5 / +5 / +10 append a new set weight by incrementing the last value in the per-set string
+- [x] PWA manifest + icons — add-to-home-screen on iOS/Android, opens standalone (no browser chrome)
 
 ### Multi-agent analysis
 - [x] Pulse (Claude Sonnet) — progressive overload, per-exercise breakdown, HR zone analysis
@@ -62,10 +65,21 @@
 - [ ] **PostgreSQL Row-Level Security** — DB-level user isolation as a second enforcement layer
 - [ ] **Invite / multi-user** — allow a second user (e.g. trainer) to view read-only
 
+### Productization (Phase 1 — Onboarding)
+- [ ] **Structured onboarding wizard** — guided setup (days/week, goal, experience, injuries, gym type) that generates the profile markdown; power users keep "Edit manually" escape hatch
+- [ ] **AI-generated program structure** — Forge proposes a cycle split (Push/Pull/Legs/Arms or simpler) from onboarding answers; user approves/tweaks
+- [ ] **Gym/equipment setup** — gym name or type (Planet Fitness, home gym, bodyweight) stored in profile; Forge adapts exercise selection accordingly
+- [ ] **Wearable setup UX** — guided OAuth flow in onboarding wizard with big buttons, not buried in settings
+
+### Productization (Phase 2 — Retention)
+- [ ] **Streaks and milestones** — consecutive weeks logged, total sessions, PRs hit; surfaced on fitness dashboard
+- [ ] **Weekly summary** — Nexus generates a Sunday rollup: volume vs. last week, recovery trend, coming week focus
+- [ ] **Progress visualization** — workout frequency heatmap, recovery trend chart, personal records timeline
+- [ ] **Notifications / digest** — "Your next workout is tomorrow — here's what Forge prescribes" as email or push
+
 ### Phase 3 — Beyond fitness
 - [ ] Finance domain (portfolio tracking, Roth conversion planning, retirement modeling)
 - [ ] Health domain (supplement tracking, lab results, longevity scoring)
 - [ ] Work domain (project milestones, focus tracking)
 - [ ] Cross-domain Nexus signals — poor sleep flagged in both fitness recovery AND work focus
 - [ ] Weekly digest email
-- [ ] Mobile app (Expo wrapper or PWA)
