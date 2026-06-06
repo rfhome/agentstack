@@ -1,0 +1,4 @@
+# Nixpacks build configuration for Railway
+# Fixes: "npm warn config production Use --omit=dev instead"
+[phases.install]
+cmds = ["npm install --omit=dev"]
