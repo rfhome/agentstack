@@ -36,6 +36,12 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - Tests live in `__tests__/` subdirectory next to the code they test
 - Do not import Prisma, Next.js, or API routes in unit tests — test pure logic only
 
+### Streaks
+- Pure logic in `src/lib/streaks.ts`: `computeStreaks(dates[], now?)` → `StreakStats`
+- `weekStart(date)` returns Monday 00:00 of the containing week; `weekKey(monday)` returns YYYY-MM-DD
+- `GET /api/stats` returns `StreakStats + goalsAchieved`; queries all session dates + achieved goal count
+- `StreaksCard` component fetches `/api/stats` on mount and renders a 2×2/4-col stat grid
+
 ### Security
 - All user-supplied text is scanned with `detectInjection()` / `detectInjectionInFields()` from `src/lib/security.ts` before saving or forwarding to agents
 - Agent inputs are wrapped in XML delimiters via `wrapAgentInput()` / `wrapNexusInput()`

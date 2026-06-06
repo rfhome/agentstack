@@ -56,7 +56,6 @@
 
 ### Near-term
 - [ ] **Cardio machine photo analysis** — upload treadmill/bike/rower screenshot; Lens extracts duration, distance, HR, calories and auto-populates the session form
-- [ ] **Weekly summary** — Nexus generates a Sunday rollup: volume vs. last week, recovery trend, coming week focus
 - [ ] **Auto-populate session metrics from Fitbit** — pull today's HR / AZM / duration directly into the log form when connected, so you don't have to type them
 
 ### Medium-term
@@ -74,8 +73,8 @@
 - [ ] **Wearable setup UX** — guided OAuth flow in onboarding wizard with big buttons, not buried in settings
 
 ### Productization (Phase 2 — Retention)
-- [ ] **Streaks and milestones** — consecutive weeks logged, total sessions, PRs hit; surfaced on fitness dashboard
-- [ ] **Weekly summary** — Nexus generates a Sunday rollup: volume vs. last week, recovery trend, coming week focus
+- [x] **Streaks card** — `StreaksCard` on fitness dashboard: current week streak, this-week vs last-week delta, total sessions, goals achieved; computed by `computeStreaks()` in `src/lib/streaks.ts`; `GET /api/stats` returns stats
+- [x] **Weekly summary** — `WeeklySummary` client component on fitness dashboard; `POST /api/weekly-summary` calls Nexus (Claude Sonnet) with this/prev week sessions + Oura recovery data; stored as `domain="weekly"` Recommendation; user triggers on demand; uses `extractJSON` + `wrapAgentInput` + `SECURITY_CANARY`
 - [ ] **Progress visualization** — workout frequency heatmap, recovery trend chart, personal records timeline
 - [ ] **Notifications / digest** — "Your next workout is tomorrow — here's what Forge prescribes" as email or push
 

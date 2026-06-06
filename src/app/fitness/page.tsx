@@ -9,6 +9,7 @@ import { SessionCard } from "@/components/SessionCard";
 import { RecommendationFeed } from "@/components/RecommendationFeed";
 import { GoalTracker } from "@/components/GoalTracker";
 import { WeeklySummary } from "@/components/WeeklySummary";
+import { StreaksCard } from "@/components/StreaksCard";
 
 export default async function FitnessPage() {
   const session = await auth();
@@ -60,6 +61,13 @@ export default async function FitnessPage() {
           </Link>
         </div>
       )}
+
+      <section>
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Your Stats</h2>
+        <Suspense fallback={null}>
+          <StreaksCard />
+        </Suspense>
+      </section>
 
       <section>
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">This Week</h2>
