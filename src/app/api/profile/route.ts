@@ -18,6 +18,8 @@ export async function GET() {
     return NextResponse.json({
       name: profile?.name ?? "",
       context: profile?.context ?? "",
+      programConfig: profile?.programConfig ?? null,
+      onboardingComplete: profile?.onboardingComplete ?? false,
     });
   } catch (err) {
     console.error("[GET /api/profile]", err);
@@ -33,7 +35,13 @@ export async function PUT(req: NextRequest) {
     }
 
     const userId = session.user.id;
-    const { name, context } = (await req.json()) as { name: string; context: string };
+    const body = (await req.json()) as {
+      name: string;
+      context: string;
+      programConfig?: unknown;
+      onboardingComplete?: boolean;
+    };
+    const { name, context, programConfig, onboardingComplete } = body;
 
     // Injection check — profile context is passed verbatim to all agents as userContext
     if (context && detectInjection(context)) {
@@ -43,10 +51,18 @@ export async function PUT(req: NextRequest) {
 
     await withRLS(userId, async (db) => {
       const existing = await db.userProfile.findFirst({ where: { userId } });
+      const data = {
+        name,
+        context,
+        ...(programConfig !== undefined
+          ? { programConfig: JSON.parse(JSON.stringify(programConfig)) }
+          : {}),
+        ...(onboardingComplete !== undefined ? { onboardingComplete } : {}),
+      };
       if (existing) {
-        await db.userProfile.update({ where: { id: existing.id }, data: { name, context } });
+        await db.userProfile.update({ where: { id: existing.id }, data });
       } else {
-        await db.userProfile.create({ data: { userId, name, context } });
+        await db.userProfile.create({ data: { userId, ...data } });
       }
     });
 

@@ -49,7 +49,7 @@ export default async function FitnessPage() {
         </Link>
       </div>
 
-      {!profile?.context && (
+      {!profile?.onboardingComplete && (
         <div className="rounded-xl border border-violet-800 bg-violet-900/20 p-4 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-violet-300">Build your training profile</p>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
+import type { CycleDay } from "@/lib/onboarding/types";
 
 type Exercise = { name: string; sets: string; reps: string; weights: string; notes: string };
 type CardioEntry = {
@@ -39,7 +40,12 @@ type Prescription = {
 
 const ANALYZING_STEPS = ["Pulse analyzing...", "Forge reviewing...", "Nexus synthesizing..."];
 const DRAFT_KEY = "log-draft";
-const CYCLE_LABELS: Record<string, string> = { "1": "Push", "2": "Pull", "3": "Legs", "4": "Arms" };
+const DEFAULT_CYCLE_DAYS: CycleDay[] = [
+  { day: 1, label: "Push", focus: "Chest, shoulders, triceps" },
+  { day: 2, label: "Pull", focus: "Back, biceps" },
+  { day: 3, label: "Legs", focus: "Quads, hamstrings, glutes" },
+  { day: 4, label: "Arms", focus: "Bicep/tricep isolation" },
+];
 
 // Appends a new weight to a comma-separated weights string, incrementing the last value.
 // e.g. appendWeight("95,95", 5) → "95,95,100"
@@ -105,6 +111,9 @@ export default function LogSessionPage() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState("");
 
+  // Cycle structure from user's programConfig (falls back to Push/Pull/Legs/Arms)
+  const [cycleDays, setCycleDays] = useState<CycleDay[]>(DEFAULT_CYCLE_DAYS);
+
   // Template loading
   const [loadingTemplate, setLoadingTemplate] = useState(false);
   const [templateDate, setTemplateDate] = useState<string | null>(null);
@@ -159,6 +168,25 @@ export default function LogSessionPage() {
         }
       })
       .catch(() => { /* ignore — user can fill manually */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load cycle structure from user's programConfig
+  useEffect(() => {
+    fetch("/api/profile")
+      .then(r => r.json())
+      .then(p => {
+        const cycles = p?.programConfig?.cycleStructure;
+        if (Array.isArray(cycles) && cycles.length > 0) {
+          setCycleDays(cycles);
+          // Keep cycleDay in range
+          setCycleDay(d => {
+            const max = String(cycles.length);
+            return parseInt(d) > cycles.length ? "1" : d;
+          });
+        }
+      })
+      .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -534,7 +562,8 @@ export default function LogSessionPage() {
   }
 
   if (step === "analyzing" || step === "saving") {
-    const cycleLabel = cycleDay === "1" ? "Push" : cycleDay === "2" ? "Pull" : cycleDay === "3" ? "Legs" : cycleDay === "4" ? "Arms" : `Day ${cycleDay}`;
+    const cycleDayNum = parseInt(cycleDay);
+    const cycleLabel = cycleDays.find(d => d.day === cycleDayNum)?.label ?? `Day ${cycleDay}`;
     const savedExercises = exercises.filter(ex => ex.name.trim());
     const savedCardio = cardioEntries.filter(c => c.tag && c.machine);
     return (
@@ -628,10 +657,11 @@ export default function LogSessionPage() {
               <label className="block text-xs text-zinc-500 mb-1">Cycle Day</label>
               <select value={cycleDay} onChange={(e) => setCycleDay(e.target.value)}
                 className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-600">
-                <option value="1">1 — Push</option>
-                <option value="2">2 — Pull</option>
-                <option value="3">3 — Legs</option>
-                <option value="4">4 — Arms</option>
+                {cycleDays.map((d) => (
+                  <option key={d.day} value={String(d.day)}>
+                    {d.day} — {d.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -756,7 +786,7 @@ export default function LogSessionPage() {
                 {loadingTemplate ? (
                   <><span className="w-3 h-3 border border-zinc-600 border-t-zinc-300 rounded-full animate-spin" /> Loading...</>
                 ) : (
-                  <>Last {CYCLE_LABELS[cycleDay] ?? `Day ${cycleDay}`}</>
+                  <>Last {cycleDays.find(d => d.day === parseInt(cycleDay))?.label ?? `Day ${cycleDay}`}</>
                 )}
               </button>
               <button type="button" onClick={handleGetWorkout} disabled={loadingWorkout}

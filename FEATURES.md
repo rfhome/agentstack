@@ -66,9 +66,11 @@
 - [ ] **Invite / multi-user** — allow a second user (e.g. trainer) to view read-only
 
 ### Productization (Phase 1 — Onboarding)
-- [ ] **Structured onboarding wizard** — guided setup (days/week, goal, experience, injuries, gym type) that generates the profile markdown; power users keep "Edit manually" escape hatch
-- [ ] **AI-generated program structure** — Forge proposes a cycle split (Push/Pull/Legs/Arms or simpler) from onboarding answers; user approves/tweaks
-- [ ] **Gym/equipment setup** — gym name or type (Planet Fitness, home gym, bodyweight) stored in profile; Forge adapts exercise selection accordingly
+- [x] **Structured onboarding wizard** — 9-step guided setup (goal, experience, split, gym, injuries, activities) with back-nav and progress bar; pre-populates on re-run from existing programConfig
+- [x] **AI-generated program structure** — Nexus/Claude generates full markdown coaching profile; `deriveProgramConfig()` maps answers to a typed `ProgramConfig` with `cycleStructure`; review step shows generated cycle days before confirmation
+- [x] **Gym/equipment setup** — gym type stored in `programConfig.gymType`; supports commercial, Planet Fitness, home gym, bodyweight; coaching profile includes equipment constraints
+- [x] **Dynamic cycle days** — log page fetches `programConfig.cycleStructure` on mount; cycle selector and template button reflect actual user program (falls back to Push/Pull/Legs/Arms)
+- [x] **`onboardingComplete` flag** — UserProfile schema; fitness page banner uses it; existing users with profiles already marked as completed
 - [ ] **Wearable setup UX** — guided OAuth flow in onboarding wizard with big buttons, not buried in settings
 
 ### Productization (Phase 2 — Retention)

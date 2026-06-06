@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import type { CycleDay, ProgramConfig } from "@/lib/onboarding/types";
 
 type StepType = "single" | "multi" | "text";
 
@@ -75,7 +75,7 @@ const STEPS: Step[] = [
     type: "single",
     question: "Where do you train?",
     options: [
-      { id: "limited", label: "Commercial gym (machines, cables, Smith, dumbbells)", sub: "e.g. Planet Fitness style" },
+      { id: "limited", label: "Planet Fitness", sub: "Machines & cables, dumbbells up to 75 lbs, no Olympic barbell" },
       { id: "full", label: "Full commercial gym", sub: "Includes Olympic barbells and power racks" },
       { id: "home", label: "Home gym", sub: "Some equipment available" },
       { id: "minimal", label: "Bodyweight / minimal equipment" },
@@ -92,7 +92,7 @@ const STEPS: Step[] = [
       { id: "rower", label: "Rowing machine" },
       { id: "elliptical", label: "Elliptical" },
       { id: "outdoor", label: "Outdoor running or cycling" },
-      { id: "none", label: "No cardio" },
+      { id: "none", label: "No dedicated cardio" },
     ],
   },
   {
@@ -126,24 +126,62 @@ const STEPS: Step[] = [
 
 interface OnboardingWizardProps {
   hasProfile: boolean;
+  existingProgramConfig?: ProgramConfig | null;
 }
 
-export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
-  const router = useRouter();
+export function OnboardingWizard({ hasProfile, existingProgramConfig }: OnboardingWizardProps) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
 
+  // Review state — shown after generation
+  const [reviewCycles, setReviewCycles] = useState<CycleDay[] | null>(null);
+
+  // Pre-populate answers from existing programConfig (re-running the wizard)
+  useEffect(() => {
+    if (!existingProgramConfig) return;
+    const pc = existingProgramConfig;
+
+    // Reverse-map programConfig fields back to wizard answer IDs
+    const goalReverse: Record<string, string> = {
+      build_muscle: "strength",
+      lose_weight: "weight",
+      stay_healthy: "longevity",
+      athletic_performance: "endurance",
+    };
+    const expReverse: Record<string, string> = {
+      beginner: "beginner",
+      intermediate: "1-2y",
+      advanced: "5plus",
+    };
+    const gymReverse: Record<string, string> = {
+      planet_fitness: "limited",
+      commercial: "full",
+      home_gym: "home",
+      bodyweight: "minimal",
+    };
+    const splitReverse: Record<number, string> = { 4: "ppla", 3: "ppl", 2: "ul" };
+
+    setAnswers({
+      primaryGoal: goalReverse[pc.goal] ?? "",
+      experience: expReverse[pc.experienceLevel] ?? "",
+      equipment: gymReverse[pc.gymType] ?? "",
+      split: splitReverse[pc.daysPerWeek] ?? "fullbody",
+      injuries: pc.injuries.join(", "),
+      otherActivities: pc.otherActivities,
+    });
+  }, [existingProgramConfig]);
+
   const currentStep = STEPS[step];
 
   function canAdvance(): boolean {
+    if (!currentStep) return false;
     if (currentStep.type === "single") {
       const val = answers[currentStep.id];
       return typeof val === "string" && val.length > 0;
     }
-    // multi and text are always advanceable
-    return true;
+    return true; // multi and text steps are always skippable
   }
 
   function handleSingleSelect(optionId: string) {
@@ -166,7 +204,7 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
     if (step < STEPS.length - 1) {
       setStep((s) => s + 1);
     } else {
-      handleFinish();
+      handleGenerate();
     }
   }
 
@@ -174,7 +212,7 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
     if (step > 0) setStep((s) => s - 1);
   }
 
-  async function handleFinish() {
+  async function handleGenerate() {
     setGenerating(true);
     setError("");
     try {
@@ -183,28 +221,103 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(answers),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error((data as { error?: string }).error ?? "Generation failed");
-      }
-      router.push("/fitness");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Generation failed");
+      // Show review step with the generated cycle structure
+      setReviewCycles(data.cycleStructure ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setGenerating(false);
     }
   }
 
-  if (generating) {
+  // -------------------------------------------------------------------------
+  // Generating screen
+  // -------------------------------------------------------------------------
+  if (generating && !reviewCycles) {
     return (
-      <div className="max-w-lg mx-auto py-12 px-4 flex flex-col items-center justify-center min-h-[400px]">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 flex flex-col items-center gap-4 w-full">
-          <div className="w-8 h-8 border-2 border-zinc-600 border-t-violet-400 rounded-full animate-spin" />
-          <p className="text-zinc-400 text-sm">Nexus is building your profile...</p>
+      <div className="max-w-lg mx-auto py-12 px-4">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-10 flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
+          <p className="text-zinc-300 text-sm font-medium">Building your training profile...</p>
+          <p className="text-xs text-zinc-600 text-center">
+            Analyzing your goals, experience, and gym setup
+          </p>
         </div>
       </div>
     );
   }
 
+  // -------------------------------------------------------------------------
+  // Review step — shown after generation
+  // -------------------------------------------------------------------------
+  if (reviewCycles) {
+    const splitLabels: Record<string, string> = {
+      ppla: "Push / Pull / Legs / Arms",
+      ppl: "Push / Pull / Legs",
+      ul: "Upper / Lower",
+      fullbody: "Full Body",
+      unsure: "Full Body",
+    };
+    const splitLabel = splitLabels[answers.split as string] ?? "Custom";
+
+    return (
+      <div className="max-w-lg mx-auto py-12 px-4 space-y-6">
+        <div>
+          <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Your program</p>
+          <h1 className="text-2xl font-bold text-white">{splitLabel} Split</h1>
+          <p className="text-sm text-zinc-400 mt-1">
+            Your training profile has been generated. Here's your cycle structure:
+          </p>
+        </div>
+
+        {/* Cycle day cards */}
+        <div className="space-y-2">
+          {reviewCycles.map((day) => (
+            <div
+              key={day.day}
+              className="rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3 flex gap-4 items-center"
+            >
+              <div className="shrink-0 w-8 h-8 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-bold flex items-center justify-center">
+                {day.day}
+              </div>
+              <div>
+                <p className="font-semibold text-white text-sm">{day.label}</p>
+                <p className="text-xs text-zinc-400 mt-0.5">{day.focus}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <p className="text-xs text-zinc-500">
+          Your full coaching profile has been saved. Your agents will use it on every session analysis and workout prescription.
+        </p>
+
+        <div className="space-y-3 pt-2">
+          <button
+            onClick={() => { window.location.href = "/fitness"; }}
+            className="w-full rounded-xl bg-white text-zinc-950 py-4 text-sm font-bold hover:bg-zinc-200 transition-colors"
+          >
+            Start training →
+          </button>
+          <button
+            onClick={() => {
+              setReviewCycles(null);
+              setGenerating(false);
+              setStep(STEPS.length - 1);
+            }}
+            className="w-full rounded-xl border border-zinc-700 text-zinc-400 py-3 text-sm hover:text-white hover:border-zinc-500 transition-colors"
+          >
+            Go back and change something
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Wizard steps
+  // -------------------------------------------------------------------------
   const selectedSingle = typeof answers[currentStep.id] === "string"
     ? (answers[currentStep.id] as string)
     : "";
@@ -224,9 +337,7 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
             <div
               key={i}
               className={`h-1.5 rounded-full transition-all ${
-                i <= step
-                  ? "w-6 bg-violet-500"
-                  : "w-1.5 bg-zinc-700"
+                i <= step ? "w-6 bg-white" : "w-1.5 bg-zinc-700"
               }`}
             />
           ))}
@@ -234,10 +345,11 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
 
         {/* Heading */}
         <div>
-          <h1 className="text-lg font-semibold text-white">
-            {hasProfile ? "Update your training profile" : "Let's build your training profile"}
-          </h1>
-          <p className="mt-2 text-base text-zinc-200 font-medium">{currentStep.question}</p>
+          <p className="text-xs text-zinc-500 mb-1">
+            {hasProfile ? "Update your training profile" : "Set up your training profile"}
+            {" · "}Step {step + 1} of {STEPS.length}
+          </p>
+          <p className="text-base text-white font-semibold">{currentStep.question}</p>
           {currentStep.subtext && (
             <p className="mt-0.5 text-sm text-zinc-400">{currentStep.subtext}</p>
           )}
@@ -255,8 +367,8 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
                     onClick={() => handleSingleSelect(opt.id)}
                     className={`rounded-xl border p-4 cursor-pointer text-left transition-colors ${
                       isSelected
-                        ? "border-violet-500 bg-violet-900/20 text-white"
-                        : "border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-600"
+                        ? "border-white bg-white/10 text-white"
+                        : "border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-500 hover:text-white"
                     }`}
                   >
                     <span className="font-medium text-sm">{opt.label}</span>
@@ -279,12 +391,12 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
                     onClick={() => handleMultiToggle(opt.id)}
                     className={`relative rounded-xl border p-4 cursor-pointer text-left transition-colors ${
                       isSelected
-                        ? "border-violet-500 bg-violet-900/20 text-white"
-                        : "border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-600"
+                        ? "border-white bg-white/10 text-white"
+                        : "border-zinc-700 bg-zinc-800/50 text-zinc-300 hover:border-zinc-500 hover:text-white"
                     }`}
                   >
                     {isSelected && (
-                      <span className="absolute top-2.5 right-3 text-violet-400 text-xs font-bold">✓</span>
+                      <span className="absolute top-3 right-3 text-white text-xs font-bold">✓</span>
                     )}
                     <span className="font-medium text-sm pr-5">{opt.label}</span>
                     {opt.sub && (
@@ -318,7 +430,7 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
               onClick={handleBack}
               className="text-zinc-500 hover:text-white text-sm transition-colors"
             >
-              Back
+              ← Back
             </button>
           ) : (
             <div />
@@ -326,7 +438,7 @@ export function OnboardingWizard({ hasProfile }: OnboardingWizardProps) {
           <button
             onClick={handleNext}
             disabled={!canAdvance()}
-            className="rounded-lg bg-white text-zinc-950 px-6 py-2 text-sm font-semibold hover:bg-zinc-200 disabled:opacity-40 transition-colors"
+            className="rounded-lg bg-white text-zinc-950 px-6 py-2.5 text-sm font-semibold hover:bg-zinc-200 disabled:opacity-30 transition-colors"
           >
             {step === STEPS.length - 1 ? "Generate my profile →" : "Next →"}
           </button>

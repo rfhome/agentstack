@@ -144,10 +144,12 @@ model WearableConnection {
 }
 
 model UserProfile {
-  id        Int      @id @default(autoincrement())
-  userId    String?  @unique
-  user      User?    @relation(fields: [userId], references: [id])
-  name      String   @default("Roberto")
-  context   String
-  updatedAt DateTime @updatedAt
+  id                 Int      @id @default(autoincrement())
+  userId             String?  @unique
+  user               User?    @relation(fields: [userId], references: [id])
+  name               String   @default("")
+  context            String   @default("")
+  programConfig      Json?
+  onboardingComplete Boolean  @default(false)
+  updatedAt          DateTime @updatedAt
 }
