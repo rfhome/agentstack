@@ -5,6 +5,7 @@ import Link from "next/link";
 import AuthProvider from "@/components/AuthProvider";
 import NavUser from "@/components/NavUser";
 import BottomNav from "@/components/BottomNav";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
@@ -12,6 +13,10 @@ export const metadata: Metadata = {
   title: "AgentStack",
   description: "Multi-agent intelligence system",
   manifest: "/manifest.json",
+  // apple-touch-icon for iOS and Android Chrome fallback
+  icons: {
+    apple: "/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {
@@ -24,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${geist.variable} h-full`}>
       <body className="min-h-full bg-zinc-950 text-zinc-100 antialiased">
+        <ServiceWorkerRegistrar />
         <AuthProvider>
           {/* Top bar */}
           <nav className="border-b border-zinc-800 px-4 py-3 flex items-center gap-6">

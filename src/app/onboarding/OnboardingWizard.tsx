@@ -127,9 +127,10 @@ const STEPS: Step[] = [
 interface OnboardingWizardProps {
   hasProfile: boolean;
   existingProgramConfig?: ProgramConfig | null;
+  tier?: string;
 }
 
-export function OnboardingWizard({ hasProfile, existingProgramConfig }: OnboardingWizardProps) {
+export function OnboardingWizard({ hasProfile, existingProgramConfig, tier = "free" }: OnboardingWizardProps) {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
   const [generating, setGenerating] = useState(false);
@@ -137,6 +138,8 @@ export function OnboardingWizard({ hasProfile, existingProgramConfig }: Onboardi
 
   // Review state — shown after generation
   const [reviewCycles, setReviewCycles] = useState<CycleDay[] | null>(null);
+  // Which wearables the user said they have (from the wizard "wearables" step)
+  const selectedWearables = (answers["wearables"] as string[] | undefined) ?? [];
 
   // Pre-populate answers from existing programConfig (re-running the wizard)
   useEffect(() => {
@@ -292,6 +295,42 @@ export function OnboardingWizard({ hasProfile, existingProgramConfig }: Onboardi
         <p className="text-xs text-zinc-500">
           Your full coaching profile has been saved. Your agents will use it on every session analysis and workout prescription.
         </p>
+
+        {/* Wearable connect step — only for beta/premium users who said they have wearables */}
+        {tier !== "free" && (selectedWearables.includes("oura") || selectedWearables.includes("fitbit")) && (
+          <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-4 space-y-3">
+            <p className="text-sm font-medium text-white">Connect your wearables</p>
+            <p className="text-xs text-zinc-400">
+              Give your agents live recovery and HR data — makes analysis and prescriptions much more accurate.
+            </p>
+            <div className="flex flex-col gap-2">
+              {selectedWearables.includes("oura") && (
+                <a
+                  href="/api/wearables/oura/authorize"
+                  className="flex items-center justify-between rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-4 py-3 text-sm text-white transition-colors"
+                >
+                  <span className="font-medium">Connect Oura Ring</span>
+                  <span className="text-zinc-400 text-xs">Readiness, HRV, sleep →</span>
+                </a>
+              )}
+              {selectedWearables.includes("fitbit") && (
+                <a
+                  href="/api/wearables/fitbit/authorize"
+                  className="flex items-center justify-between rounded-lg bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-4 py-3 text-sm text-white transition-colors"
+                >
+                  <span className="font-medium">Connect Fitbit</span>
+                  <span className="text-zinc-400 text-xs">HR zones, AZM →</span>
+                </a>
+              )}
+              <button
+                onClick={() => { window.location.href = "/fitness"; }}
+                className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors pt-1"
+              >
+                Skip for now
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="space-y-3 pt-2">
           <button

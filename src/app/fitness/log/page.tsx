@@ -262,6 +262,8 @@ export default function LogSessionPage() {
       const d = json.data;
       if (d.avgHeartRate != null && !avgHR) setAvgHR(String(d.avgHeartRate));
       if (d.activeZoneMinutes != null && !azm) setAzm(String(d.activeZoneMinutes));
+      // activeMinutes is a reasonable proxy for session duration when duration isn't set
+      if (d.activeMinutes != null && d.activeMinutes > 0 && !duration) setDuration(String(d.activeMinutes));
     } catch {
       // silent
     } finally {
@@ -681,6 +683,28 @@ export default function LogSessionPage() {
             </div>
           </div>
 
+          {/* Fitbit fill button — shown as a full-width action row */}
+          <button
+            type="button"
+            onClick={handleFillFromFitbit}
+            disabled={fillingFitbit}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50"
+          >
+            {fillingFitbit ? (
+              <>
+                <span className="w-3.5 h-3.5 border border-zinc-500 border-t-white rounded-full animate-spin" />
+                Filling from Fitbit...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+                </svg>
+                Fill HR, AZM &amp; Duration from Fitbit
+              </>
+            )}
+          </button>
+
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs text-zinc-500 mb-1">Avg HR</label>
@@ -695,17 +719,7 @@ export default function LogSessionPage() {
                 className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
             </div>
             <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-xs text-zinc-500">AZM</label>
-                <button
-                  type="button"
-                  onClick={handleFillFromFitbit}
-                  disabled={fillingFitbit}
-                  className="text-xs text-zinc-500 hover:text-zinc-300 underline transition-colors disabled:opacity-50"
-                >
-                  {fillingFitbit ? "Filling..." : "Fill from Fitbit"}
-                </button>
-              </div>
+              <label className="block text-xs text-zinc-500 mb-1">AZM</label>
               <input type="number" value={azm} onChange={(e) => setAzm(e.target.value)}
                 placeholder="34"
                 className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />

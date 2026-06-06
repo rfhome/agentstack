@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { extractJSON } from "@/lib/agents/parse";
 
 export const dynamic = "force-dynamic";
 
@@ -36,11 +37,7 @@ export async function POST(req: NextRequest) {
 
     const text = result.response.text();
 
-    const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-    const objectMatch = text.match(/(\{[\s\S]*\})/);
-    const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
-
-    let parsed: {
+    type PhotoResult = {
       durationMinutes: number | null;
       distanceMiles: number | null;
       calories: number | null;
@@ -51,14 +48,16 @@ export async function POST(req: NextRequest) {
       incline: number | null;
     };
 
-    try {
-      parsed = JSON.parse(clean);
-    } catch {
-      return NextResponse.json(
-        { error: "Failed to parse Gemini response", raw: text },
-        { status: 422 }
-      );
-    }
+    const parsed = extractJSON<PhotoResult>(text, {
+      durationMinutes: null,
+      distanceMiles: null,
+      calories: null,
+      avgHeartRate: null,
+      maxHeartRate: null,
+      pace: null,
+      resistance: null,
+      incline: null,
+    });
 
     // Normalize to the field names the log form expects
     return NextResponse.json({
