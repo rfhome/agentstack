@@ -7,7 +7,7 @@ import { auth } from "@/auth";
 import { withRLS } from "@/lib/prisma-rls";
 import { SessionCard } from "@/components/SessionCard";
 import { RecommendationFeed } from "@/components/RecommendationFeed";
-import { GoalTracker } from "@/components/GoalTracker";
+import { GoalManager } from "@/components/GoalManager";
 import { WeeklySummary } from "@/components/WeeklySummary";
 import { StreaksCard } from "@/components/StreaksCard";
 
@@ -33,7 +33,7 @@ export default async function FitnessPage() {
         orderBy: { createdAt: "desc" },
         include: { session: { select: { cycleDay: true, rating: true } } },
       }),
-      db.goal.findMany({ where: { userId, achieved: false } }),
+      Promise.resolve([]), // goals now fetched client-side by GoalManager
       db.userProfile.findFirst({ where: { userId } }),
     ])
   );
@@ -83,7 +83,7 @@ export default async function FitnessPage() {
 
       <section>
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Goals</h2>
-        <GoalTracker goals={goals} />
+        <GoalManager />
       </section>
 
       <section>
