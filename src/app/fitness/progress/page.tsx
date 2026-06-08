@@ -160,16 +160,18 @@ function PRCard({ pr }: { pr: PR }) {
 function RecoveryTrendChart({ trend }: { trend: TrendPoint[] }) {
   if (trend.length === 0) return null;
 
-  const chartData = trend.map((p) => ({
+  // Filter out any points with missing dates to prevent "Invalid Date" on the axis
+  const validTrend = trend.filter((p) => p.date && !isNaN(new Date(p.date + "T00:00:00").getTime()));
+  const chartData = validTrend.map((p) => ({
     label: formatDate(p.date),
     readiness: p.readiness,
     sleep: p.sleep,
     hrv: p.hrv,
   }));
 
-  const hasReadiness = trend.some((p) => p.readiness !== null);
-  const hasSleep = trend.some((p) => p.sleep !== null);
-  const hasHRV = trend.some((p) => p.hrv !== null);
+  const hasReadiness = validTrend.some((p) => p.readiness !== null);
+  const hasSleep = validTrend.some((p) => p.sleep !== null);
+  const hasHRV = validTrend.some((p) => p.hrv !== null);
 
   const tooltipStyle = {
     backgroundColor: "#18181b",

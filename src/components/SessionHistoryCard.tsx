@@ -41,6 +41,8 @@ type Session = {
   cycleNumber: number | null;
   durationMinutes: number | null;
   avgHeartRate: number | null;
+  activeZoneMinutes: number | null;
+  cardioLoad: number | null;
   rating: string | null;
   notes: string | null;
   exercises: Exercise[];
@@ -71,14 +73,41 @@ const AGENT_STYLES: Record<string, { border: string; badge: string; dot: string 
 };
 
 function parseAgentResponse(text: string): ParsedAgent {
-  try {
-    const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-    const objectMatch = text.match(/(\{[\s\S]*\})/);
-    const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
-    return JSON.parse(clean) as ParsedAgent;
-  } catch {
-    return { analysis: text };
+  // 1. Try parsing the whole text first (most common: LLM returns pure JSON)
+  try { return JSON.parse(text.trim()) as ParsedAgent; } catch { /* continue */ }
+
+  // 2. Try markdown fence
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch?.[1]) {
+    try { return JSON.parse(fenceMatch[1]) as ParsedAgent; } catch { /* continue */ }
   }
+
+  // 3. Balanced-brace extraction: walk from the first `{` tracking depth,
+  //    respecting strings and escape sequences. This handles preamble text
+  //    and stray `{` in surrounding content that break the greedy regex.
+  const start = text.indexOf('{');
+  if (start !== -1) {
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < text.length; i++) {
+      const c = text[i];
+      if (escaped) { escaped = false; continue; }
+      if (c === '\\' && inString) { escaped = true; continue; }
+      if (c === '"') { inString = !inString; continue; }
+      if (!inString) {
+        if (c === '{') depth++;
+        else if (c === '}') {
+          depth--;
+          if (depth === 0) {
+            try { return JSON.parse(text.slice(start, i + 1)) as ParsedAgent; } catch { break; }
+          }
+        }
+      }
+    }
+  }
+
+  return { analysis: text };
 }
 
 export function SessionHistoryCard({ session }: { session: Session }) {
@@ -159,9 +188,10 @@ export function SessionHistoryCard({ session }: { session: Session }) {
         </div>
 
         <button onClick={() => setExpanded((v) => !v)} className="w-full text-left">
-          <div className="flex gap-4 text-xs text-zinc-500 mt-1.5">
+          <div className="flex gap-4 text-xs text-zinc-500 mt-1.5 flex-wrap">
             {session.durationMinutes ? <span>{session.durationMinutes}min</span> : null}
-            {session.avgHeartRate ? <span>{session.avgHeartRate}bpm avg HR</span> : null}
+            {session.avgHeartRate ? <span>{session.avgHeartRate}bpm</span> : null}
+            {session.activeZoneMinutes ? <span>{session.activeZoneMinutes}AZM</span> : null}
             {session.exercises.length > 0 ? (
               <span>{session.exercises.length} exercise{session.exercises.length !== 1 ? "s" : ""}</span>
             ) : null}

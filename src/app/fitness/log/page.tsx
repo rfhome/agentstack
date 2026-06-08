@@ -122,6 +122,9 @@ export default function LogSessionPage() {
   const [acceptedRating, setAcceptedRating] = useState<string | null>(null);
   const [savingRating, setSavingRating] = useState(false);
 
+  // Track which exercise card is active (for gym-visibility orange border)
+  const [focusedExercise, setFocusedExercise] = useState<number | null>(null);
+
   // Load existing session when opened via ?edit=ID
   useEffect(() => {
     const editId = searchParams.get("edit");
@@ -370,6 +373,7 @@ export default function LogSessionPage() {
     try {
       const sessionId = await saveSession();
       localStorage.removeItem(DRAFT_KEY);
+      setSavedSessionId(sessionId);
       setStep("analyzing");
 
       const interval = setInterval(() => {
@@ -841,13 +845,20 @@ export default function LogSessionPage() {
           </div>
           <div className="space-y-2">
             {exercises.map((ex, i) => (
-              <div key={i} className="rounded-lg border border-zinc-800 bg-zinc-900 p-3 space-y-2.5">
+              <div
+                key={i}
+                className={`rounded-lg border bg-zinc-900 p-3 space-y-2.5 transition-colors ${
+                  focusedExercise === i ? "border-orange-500" : "border-zinc-800"
+                }`}
+              >
                 {/* Row 1: name + delete */}
                 <div className="flex gap-2 items-center">
                   <div className="relative flex-1">
                     <input
                       value={ex.name}
                       onChange={(e) => updateExercise(i, "name", e.target.value)}
+                      onFocus={() => setFocusedExercise(i)}
+                      onBlur={() => setFocusedExercise(null)}
                       placeholder="Exercise name"
                       className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 pr-8 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
                     />
@@ -879,12 +890,14 @@ export default function LogSessionPage() {
                   <div>
                     <label className="block text-xs text-zinc-600 mb-1">Sets</label>
                     <input value={ex.sets} onChange={(e) => updateExercise(i, "sets", e.target.value)}
+                      onFocus={() => setFocusedExercise(i)} onBlur={() => setFocusedExercise(null)}
                       placeholder="4" type="number" min="1"
                       className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
                   </div>
                   <div>
                     <label className="block text-xs text-zinc-600 mb-1">Reps</label>
                     <input value={ex.reps} onChange={(e) => updateExercise(i, "reps", e.target.value)}
+                      onFocus={() => setFocusedExercise(i)} onBlur={() => setFocusedExercise(null)}
                       placeholder="8,8,8,6"
                       className="w-full rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" />
                   </div>
@@ -897,6 +910,8 @@ export default function LogSessionPage() {
                     <input
                       value={ex.weights}
                       onChange={(e) => updateExercise(i, "weights", e.target.value)}
+                      onFocus={() => setFocusedExercise(i)}
+                      onBlur={() => setFocusedExercise(null)}
                       placeholder="95,95,100"
                       className="flex-1 rounded bg-zinc-800 border border-zinc-700 px-3 py-2.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500"
                     />

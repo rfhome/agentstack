@@ -50,6 +50,8 @@ export default async function SessionsPage() {
       cycleNumber: s.cycleNumber,
       durationMinutes: s.durationMinutes,
       avgHeartRate: s.avgHeartRate,
+      activeZoneMinutes: s.activeZoneMinutes,
+      cardioLoad: s.cardioLoad,
       rating: s.rating,
       notes: s.notes,
       exercises: s.exercises.map((ex) => ({
