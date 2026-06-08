@@ -75,7 +75,7 @@ const STEPS: Step[] = [
     type: "single",
     question: "Where do you train?",
     options: [
-      { id: "limited", label: "Planet Fitness", sub: "Machines & cables, dumbbells up to 75 lbs, no Olympic barbell" },
+      { id: "limited", label: "Machines-only gym", sub: "Planet Fitness, LA Fitness, etc. — cables, dumbbells, no Olympic barbell" },
       { id: "full", label: "Full commercial gym", sub: "Includes Olympic barbells and power racks" },
       { id: "home", label: "Home gym", sub: "Some equipment available" },
       { id: "minimal", label: "Bodyweight / minimal equipment" },
@@ -331,6 +331,27 @@ export function OnboardingWizard({ hasProfile, existingProgramConfig, tier = "fr
             </div>
           </div>
         )}
+
+        {/* How it works — quick loop explanation before the user enters the app */}
+        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 space-y-3">
+          <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">How AgentStack works</p>
+          <ol className="space-y-3">
+            {[
+              { n: "1", title: "Log a session", body: "After each workout, record your exercises, weights, reps, and cardio." },
+              { n: "2", title: "Run analysis", body: "Three AI agents — Pulse, Forge, and Lens — analyze your performance, strength progression, and recovery in parallel." },
+              { n: "3", title: "Get your plan", body: "Nexus synthesizes their findings into one clear recommendation and prescribes your next session." },
+            ].map(({ n, title, body }) => (
+              <li key={n} className="flex gap-3 text-sm">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-zinc-800 text-zinc-400 text-xs flex items-center justify-center font-semibold mt-0.5">
+                  {n}
+                </span>
+                <span className="text-zinc-300">
+                  <span className="font-semibold text-white">{title} — </span>{body}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
 
         <div className="space-y-3 pt-2">
           <button

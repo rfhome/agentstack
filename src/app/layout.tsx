@@ -7,6 +7,7 @@ import NavUser from "@/components/NavUser";
 import BottomNav from "@/components/BottomNav";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import { InstallButton } from "@/components/InstallButton";
+import { FeedbackButton } from "@/components/FeedbackButton";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 
@@ -66,6 +67,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
           {/* Add bottom padding on mobile so content clears the bottom nav */}
           <main className="max-w-2xl mx-auto px-4 py-6 pb-24 md:pb-6">{children}</main>
+
+          <FeedbackButton />
         </AuthProvider>
       </body>
     </html>

@@ -164,3 +164,10 @@ model UserProfile {
   onboardingComplete Boolean  @default(false)
   updatedAt          DateTime @updatedAt
 }
+
+model Feedback {
+  id        Int      @id @default(autoincrement())
+  userId    String?
+  content   String
+  createdAt DateTime @default(now())
+}
