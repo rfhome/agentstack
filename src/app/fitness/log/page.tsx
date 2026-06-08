@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AgentPanel } from "@/components/AgentPanel";
 import type { CycleDay } from "@/lib/onboarding/types";
@@ -78,7 +78,7 @@ function emptyExercise(): Exercise {
   return { name: "", sets: "", reps: "", weights: "", notes: "" };
 }
 
-export default function LogSessionPage() {
+function LogSessionPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -1291,5 +1291,13 @@ export default function LogSessionPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LogSessionPage() {
+  return (
+    <Suspense fallback={null}>
+      <LogSessionPageInner />
+    </Suspense>
   );
 }
