@@ -171,13 +171,13 @@ export default function ProfilePage() {
               id="context"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              rows={20}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 text-sm font-mono resize-y"
+              className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 text-sm font-mono resize-none overflow-y-auto"
+              style={{ height: "600px" }}
               placeholder="Describe your training program, goals, and health history..."
               autoFocus
             />
           ) : (
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-4 min-h-[8rem]">
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-4 min-h-[8rem] max-h-[600px] overflow-y-auto">
               <MarkdownView text={context} />
             </div>
           )}
