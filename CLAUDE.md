@@ -78,6 +78,7 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - Oura token exchange: body params with client_id/secret
 - Fitbit/Google token exchange: body params (NOT Basic auth) — Google standard
 - CSRF state: `Buffer.from(userId).toString("base64url")` — verified against active session in callback
+- **Oura API v2 uses `day` (not `date`)** on `daily_readiness`, `daily_sleep`, `daily_activity` responses. All map key lookups in `oura.ts` use `r.day ?? r.date` to handle both. The TypeScript interfaces expose both fields (`day: string`, `date?: string`). Never use `r.date` alone as a date key — it will always be `undefined` from the live API.
 
 ### Styling
 - Dark zinc theme throughout: `bg-zinc-950` page, `bg-zinc-900` cards, `border-zinc-800` borders
@@ -102,3 +103,5 @@ Scripts that run outside Next.js must use `config({ path: ".env.local", override
 - Don't strip only leading/trailing fences — use the regex extraction pattern that handles preamble text
 - Don't put `useState` calls inside conditional render blocks — React hooks must be at top level
 - Don't add user text directly into agent system prompts — always use `wrapAgentInput()` for user message content
+- Don't use `r.date` for Oura API v2 data — use `r.day ?? r.date` (v2 uses `day`)
+- Don't put `onFocus`/`onBlur` on individual inputs inside a card when you need a "card is active" highlight — put them on the container div and use `e.currentTarget.contains(e.relatedTarget)` in `onBlur` to avoid flicker when tabbing between fields within the same card

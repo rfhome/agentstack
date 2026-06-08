@@ -120,20 +120,17 @@ Stored as a `Recommendation` record linked to the session. The `suggestedRating`
 
 ## JSON parsing
 
-All agents are instructed to return raw JSON (no markdown fences). All parsers use the shared `extractJSON<T>()` utility in `src/lib/agents/parse.ts`, which applies a layered extraction strategy:
+All agents are instructed to return raw JSON (no markdown fences). Server-side agent runners use the shared `extractJSON<T>()` utility in `src/lib/agents/parse.ts`.
 
-```typescript
-// src/lib/agents/parse.ts
-export function extractJSON<T>(text: string, fallback: T): T {
-  const fenceMatch = text.match(/```(?:json)?\n?([\s\S]*?)\n?```/);
-  const objectMatch = text.match(/(\{[\s\S]*\})/);
-  const clean = fenceMatch?.[1] ?? objectMatch?.[1] ?? text;
-  try { return JSON.parse(clean) as T; }
-  catch { return fallback; }
-}
-```
+The History UI (`SessionHistoryCard`) uses a more robust `parseAgentResponse()` because the raw LLM response is stored verbatim and can arrive with (1) markdown fences, (2) preamble text before the JSON, or (3) literal unescaped newlines/tabs inside string values. Its strategy:
 
-On parse failure, the raw text is stored as `analysis` with a flag. `isValidRating()` from the same file validates A/B/C rating values.
+1. Try `JSON.parse(text)` directly (most common path)
+2. Try markdown fence extraction with the regex `/```(?:json)?\s*([\s\S]*?)\s*```/`
+3. Try balanced-brace extraction: walk character-by-character from the first `{`, tracking string boundaries and escape sequences, to find the exact closing `}` — handles preamble text and missing closing fences
+4. For each candidate string, also try `sanitizeJsonControlChars(candidate)` which escapes literal `\n`/`\r`/`\t` that appear inside string values before calling `JSON.parse`
+5. Fallback: `{ analysis: rawText }`
+
+`isValidRating()` from `parse.ts` validates A/B/C rating values.
 
 ---
 

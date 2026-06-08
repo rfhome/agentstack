@@ -87,12 +87,13 @@ npm run dev
 
 | Route | Description |
 |-------|-------------|
-| `/fitness` | Dashboard — recent sessions, recommendations, goals |
-| `/fitness/log` | Log a session with exercises, HR data, rating |
-| `/fitness/sessions` | Full session history — expandable cards with Nexus synthesis and per-agent breakdown |
-| `/fitness/progress` | Progress charts — max weight per exercise over time |
-| `/settings` | Connect/disconnect Oura Ring and Fitbit |
-| `/profile` | Edit training context (the markdown document all agents read) |
+| `/fitness` | Dashboard — streaks, this-week stats, weekly Nexus summary, recent recommendations |
+| `/fitness/log` | Log a session — exercises, HR/AZM/duration, cardio activities, rating; active exercise card highlighted in orange |
+| `/fitness/sessions` | Full session history — expandable cards with exercises, cardio, Nexus synthesis, per-agent breakdown |
+| `/fitness/progress` | Progress — 52-week training heatmap, personal records, Oura 28-day recovery trend, weight-over-time charts |
+| `/settings` | Connect/disconnect Oura Ring and Fitbit; tier badge; promo code redemption |
+| `/profile` | Edit name and full training context (the markdown document all agents read) |
+| `/onboarding` | First-run wizard — goal, experience, program structure, gym type, injuries; generates AI coaching profile |
 
 ---
 

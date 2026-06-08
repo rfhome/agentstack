@@ -39,24 +39,33 @@
 - [x] "Run Analysis" button on unanalyzed sessions (inline, no page reload)
 - [x] Progress charts (/fitness/progress) — max weight per exercise over time (recharts)
 - [x] Analyzed / Not analyzed badge on session cards
+- [x] Session cards show AZM alongside duration and avg HR in the summary row
+- [x] Cardio activities (machine, HR, duration, distance, calories) shown in expanded session view
 
 ### Profile & goals
 - [x] Profile editor (/profile) — edit name and full training context markdown
 - [x] Goals tracker — target weight/reps per exercise, mark achieved
 - [x] Recommendations feed on fitness dashboard
 
+### UX / mobile
+- [x] Bottom nav bar (mobile-only) — Fitness, History, Progress, Settings tabs with active-state highlighting
+- [x] In-app PWA install button — listens for `beforeinstallprompt`, auto-hides when already installed or running standalone
+- [x] Active exercise card gets an orange border while any field inside it has focus — gym-visibility highlight
+- [x] Fitbit fill button fills HR, AZM, and duration from today's Google Fit data in one tap
+- [x] Cardio machine photo analysis — upload treadmill/bike/rower screenshot; Lens extracts duration, distance, HR, calories and auto-populates the form
+
 ### Deployment
 - [x] Railway deployment with PostgreSQL
 - [x] AUTH_TRUST_HOST for proxy headers
 - [x] All env vars managed in Railway dashboard
+- [x] nixpacks.toml — `npm install --omit=dev` to suppress deprecated `--production` flag warning
+- [x] .hadolint.yaml — suppresses false-positive DL3025 / SC2154 warnings in Railway build logs
 
 ---
 
 ## Backlog
 
 ### Near-term
-- [ ] **Cardio machine photo analysis** — upload treadmill/bike/rower screenshot; Lens extracts duration, distance, HR, calories and auto-populates the session form
-- [ ] **Auto-populate session metrics from Fitbit** — pull today's HR / AZM / duration directly into the log form when connected, so you don't have to type them
 
 ### Medium-term
 - [ ] **ChatGPT conversation import** — parse ChatGPT data export to seed historical session records
@@ -70,7 +79,7 @@
 - [x] **Gym/equipment setup** — gym type stored in `programConfig.gymType`; supports commercial, Planet Fitness, home gym, bodyweight; coaching profile includes equipment constraints
 - [x] **Dynamic cycle days** — log page fetches `programConfig.cycleStructure` on mount; cycle selector and template button reflect actual user program (falls back to Push/Pull/Legs/Arms)
 - [x] **`onboardingComplete` flag** — UserProfile schema; fitness page banner uses it; existing users with profiles already marked as completed
-- [ ] **Wearable setup UX** — guided OAuth flow in onboarding wizard with big buttons, not buried in settings
+- [x] **Wearable setup UX** — guided OAuth flow in onboarding wizard (connect Oura / Fitbit after review step); gated behind `tier !== "free"`
 
 ### Productization (Phase 2 — Retention)
 - [x] **Streaks card** — `StreaksCard` on fitness dashboard: current week streak, this-week vs last-week delta, total sessions, goals achieved; computed by `computeStreaks()` in `src/lib/streaks.ts`; `GET /api/stats` returns stats
@@ -78,8 +87,8 @@
 - [x] **Progress page enhancements** — workout frequency heatmap (52-week GitHub-style grid), personal records summary (all-time max weight per exercise), weight-over-time charts; `GET /api/progress` now returns `{ exercises, prs, trainingDays }`
 - [x] **Access tiers + promo codes** — `User.tier` (`free`/`beta`/`premium`), `PromoCode` model, `POST /api/redeem`, tier badge + redeem UI on Settings; create codes via Railway SQL
 - [x] **Multi-user readiness** — no hardcoded user assumptions; new credential signups redirect to `/onboarding`; empty states handled across all dashboard components; data fully scoped by `userId`
-- [ ] **Wearable setup UX in onboarding** — guided OAuth flow as a paid/beta feature (gated behind `tier !== "free"`)
-- [ ] **Progress visualization** — recovery trend chart
+- [x] **Wearable setup step in onboarding** — guided OAuth connect buttons for Oura / Fitbit after the review step; gated behind `tier !== "free"`
+- [x] **Recovery trend chart** — Oura 28-day readiness + sleep score line chart plus HRV chart on `/fitness/progress`; fixed Oura API v2 field name (`day` not `date`)
 - [ ] **Notifications / digest** — "Your next workout is tomorrow — here's what Forge prescribes" as email or push
 
 ### Phase 3 — Beyond fitness
