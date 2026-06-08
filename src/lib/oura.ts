@@ -4,7 +4,8 @@ const OURA_BASE = "https://api.ouraring.com/v2/usercollection";
 const OURA_TOKEN_URL = "https://api.ouraring.com/oauth/token";
 
 export interface OuraReadiness {
-  date: string;
+  day: string;   // Oura API v2 uses "day" (YYYY-MM-DD), not "date"
+  date?: string; // legacy alias — keep for formatOuraForLens compatibility
   score: number | null;
   temperature_deviation: number | null;
   contributors: {
@@ -18,7 +19,8 @@ export interface OuraReadiness {
 }
 
 export interface OuraSleep {
-  date: string;
+  day: string;   // Oura API v2 uses "day" (YYYY-MM-DD), not "date"
+  date?: string; // legacy alias — keep for formatOuraForLens compatibility
   score: number | null;
   average_hrv: number | null;
   average_heart_rate: number | null;
@@ -29,7 +31,8 @@ export interface OuraSleep {
 }
 
 export interface OuraActivity {
-  date: string;
+  day: string;   // Oura API v2 uses "day" (YYYY-MM-DD), not "date"
+  date?: string; // legacy alias
   score: number | null;
   active_calories: number | null;
   total_calories: number | null;
@@ -188,12 +191,19 @@ export async function fetchOuraTrend(userId: string, days = 28): Promise<OuraTre
 
   const readinessByDate = new Map<string, OuraReadiness>();
   if (readinessRes.status === "fulfilled") {
-    for (const r of readinessRes.value.data) readinessByDate.set(r.date, r);
+    // Oura API v2 uses "day" field (YYYY-MM-DD); fall back to "date" for safety
+    for (const r of readinessRes.value.data) {
+      const key = r.day ?? r.date;
+      if (key) readinessByDate.set(key, r);
+    }
   }
 
   const sleepByDate = new Map<string, OuraSleep>();
   if (sleepRes.status === "fulfilled") {
-    for (const s of sleepRes.value.data) sleepByDate.set(s.date, s);
+    for (const s of sleepRes.value.data) {
+      const key = s.day ?? s.date;
+      if (key) sleepByDate.set(key, s);
+    }
   }
 
   // Build a point for every day in range that has at least one data source
@@ -214,7 +224,7 @@ export function formatOuraForLens(data: OuraData): string {
 
   if (data.readiness) {
     const r = data.readiness;
-    lines.push(`**Readiness (${r.date}):** ${r.score ?? "n/a"}/100`);
+    lines.push(`**Readiness (${r.day ?? r.date}):** ${r.score ?? "n/a"}/100`);
     if (r.temperature_deviation != null) {
       lines.push(`  Temperature deviation: ${r.temperature_deviation > 0 ? "+" : ""}${r.temperature_deviation.toFixed(2)}°C`);
     }
@@ -229,7 +239,7 @@ export function formatOuraForLens(data: OuraData): string {
   if (data.sleep) {
     const s = data.sleep;
     const hrs = s.total_sleep_duration != null ? (s.total_sleep_duration / 3600).toFixed(1) : "n/a";
-    lines.push(`**Sleep (${s.date}):** score ${s.score ?? "n/a"}/100, ${hrs}h total`);
+    lines.push(`**Sleep (${s.day ?? s.date}):** score ${s.score ?? "n/a"}/100, ${hrs}h total`);
     lines.push(`  HRV: ${s.average_hrv ?? "n/a"} ms, Resting HR: ${s.average_heart_rate ?? "n/a"} bpm, Efficiency: ${s.efficiency ?? "n/a"}%`);
     if (s.deep_sleep_duration != null) {
       lines.push(`  Deep: ${(s.deep_sleep_duration / 3600).toFixed(1)}h, REM: ${s.rem_sleep_duration != null ? (s.rem_sleep_duration / 3600).toFixed(1) : "n/a"}h`);

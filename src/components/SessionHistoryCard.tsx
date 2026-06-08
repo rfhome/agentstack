@@ -72,20 +72,53 @@ const AGENT_STYLES: Record<string, { border: string; badge: string; dot: string 
   Lens:  { border: "border-emerald-800", badge: "bg-emerald-950 text-emerald-300", dot: "bg-emerald-400" },
 };
 
+/**
+ * Escape literal control characters (newlines, tabs, CR) that appear inside
+ * JSON string values. The LLM sometimes puts real newlines inside string fields
+ * which makes the JSON invalid. This scanner respects string boundaries and
+ * escape sequences so it only touches chars that are actually inside strings.
+ */
+function sanitizeJsonControlChars(str: string): string {
+  let inString = false;
+  let escaped = false;
+  let result = "";
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (escaped) { result += c; escaped = false; continue; }
+    if (c === "\\" && inString) { result += c; escaped = true; continue; }
+    if (c === '"') { result += c; inString = !inString; continue; }
+    if (inString) {
+      if (c === "\n") { result += "\\n"; continue; }
+      if (c === "\r") { result += "\\r"; continue; }
+      if (c === "\t") { result += "\\t"; continue; }
+    }
+    result += c;
+  }
+  return result;
+}
+
+function tryParse(candidate: string): ParsedAgent | null {
+  try { return JSON.parse(candidate) as ParsedAgent; } catch { /* continue */ }
+  try { return JSON.parse(sanitizeJsonControlChars(candidate)) as ParsedAgent; } catch { /* continue */ }
+  return null;
+}
+
 function parseAgentResponse(text: string): ParsedAgent {
   // 1. Try parsing the whole text first (most common: LLM returns pure JSON)
-  try { return JSON.parse(text.trim()) as ParsedAgent; } catch { /* continue */ }
+  const direct = tryParse(text.trim());
+  if (direct) return direct;
 
-  // 2. Try markdown fence
+  // 2. Try markdown fence (handles ```json ... ``` wrappers the LLM sometimes adds)
   const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   if (fenceMatch?.[1]) {
-    try { return JSON.parse(fenceMatch[1]) as ParsedAgent; } catch { /* continue */ }
+    const fenced = tryParse(fenceMatch[1].trim());
+    if (fenced) return fenced;
   }
 
   // 3. Balanced-brace extraction: walk from the first `{` tracking depth,
-  //    respecting strings and escape sequences. This handles preamble text
-  //    and stray `{` in surrounding content that break the greedy regex.
-  const start = text.indexOf('{');
+  //    respecting strings and escape sequences. Handles preamble text and
+  //    fences without a closing ```.
+  const start = text.indexOf("{");
   if (start !== -1) {
     let depth = 0;
     let inString = false;
@@ -93,14 +126,16 @@ function parseAgentResponse(text: string): ParsedAgent {
     for (let i = start; i < text.length; i++) {
       const c = text[i];
       if (escaped) { escaped = false; continue; }
-      if (c === '\\' && inString) { escaped = true; continue; }
+      if (c === "\\" && inString) { escaped = true; continue; }
       if (c === '"') { inString = !inString; continue; }
       if (!inString) {
-        if (c === '{') depth++;
-        else if (c === '}') {
+        if (c === "{") depth++;
+        else if (c === "}") {
           depth--;
           if (depth === 0) {
-            try { return JSON.parse(text.slice(start, i + 1)) as ParsedAgent; } catch { break; }
+            const extracted = tryParse(text.slice(start, i + 1));
+            if (extracted) return extracted;
+            break;
           }
         }
       }
@@ -309,7 +344,7 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                     {isOpen && (
                       <div className="px-4 pb-4 space-y-3 text-sm border-t border-zinc-800 pt-3">
                         {parsed.analysis ? (
-                          <p className="text-zinc-300 leading-relaxed">{parsed.analysis}</p>
+                          <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">{parsed.analysis}</p>
                         ) : null}
                         {parsed.recommendations && parsed.recommendations.length > 0 && (
                           <div>
