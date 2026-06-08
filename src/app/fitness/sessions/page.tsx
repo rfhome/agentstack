@@ -7,6 +7,82 @@ import { SessionHistoryCard } from "@/components/SessionHistoryCard";
 
 const AGENT_NAMES = ["Pulse", "Forge", "Lens"];
 
+// ---------------------------------------------------------------------------
+// Server-side agent response parser
+// Extracts { analysis, recommendations, flags } from a raw LLM response string.
+// Running this on the server means we never ship unparseable JSON to the client.
+// ---------------------------------------------------------------------------
+function sanitizeJsonControlChars(str: string): string {
+  let inString = false;
+  let escaped = false;
+  let result = "";
+  for (let i = 0; i < str.length; i++) {
+    const c = str[i];
+    if (escaped) { result += c; escaped = false; continue; }
+    if (c === "\\" && inString) { result += c; escaped = true; continue; }
+    if (c === '"') { result += c; inString = !inString; continue; }
+    if (inString) {
+      if (c === "\n") { result += "\\n"; continue; }
+      if (c === "\r") { result += "\\r"; continue; }
+      if (c === "\t") { result += "\\t"; continue; }
+    }
+    result += c;
+  }
+  return result;
+}
+
+function tryParseAgentJSON(candidate: string): { analysis?: string; recommendations?: string[]; flags?: string[] } | null {
+  for (const s of [candidate, sanitizeJsonControlChars(candidate)]) {
+    try {
+      const obj = JSON.parse(s) as Record<string, unknown>;
+      if (typeof obj === "object" && obj !== null) return obj as { analysis?: string; recommendations?: string[]; flags?: string[] };
+    } catch { /* try next */ }
+  }
+  return null;
+}
+
+function parseAgentResponseServer(text: string): { analysis?: string; recommendations?: string[]; flags?: string[] } {
+  // 1. Direct parse
+  const direct = tryParseAgentJSON(text.trim());
+  if (direct) return direct;
+
+  // 2. Markdown fence
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  if (fenceMatch?.[1]) {
+    const fenced = tryParseAgentJSON(fenceMatch[1].trim());
+    if (fenced) return fenced;
+  }
+
+  // 3. Balanced-brace extraction (handles missing closing fence, preamble text)
+  const start = text.indexOf("{");
+  if (start !== -1) {
+    let depth = 0, inStr = false, esc = false;
+    for (let i = start; i < text.length; i++) {
+      const c = text[i];
+      if (esc) { esc = false; continue; }
+      if (c === "\\" && inStr) { esc = true; continue; }
+      if (c === '"') { inStr = !inStr; continue; }
+      if (!inStr) {
+        if (c === "{") depth++;
+        else if (c === "}") {
+          depth--;
+          if (depth === 0) {
+            const extracted = tryParseAgentJSON(text.slice(start, i + 1));
+            if (extracted) return extracted;
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Regex fallback — extract analysis field directly (handles completely malformed JSON)
+  const aMatch = text.match(/"analysis"\s*:\s*"((?:[^"\\]|\\[\s\S])*)"/);
+  if (aMatch) return { analysis: aMatch[1].replace(/\\n/g, "\n").replace(/\\t/g, "\t") };
+
+  return { analysis: text };
+}
+
 export default async function SessionsPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/signin");
@@ -78,11 +154,16 @@ export default async function SessionsPage() {
             nextActions: s.recommendations[0].nextActions as string[],
           }
         : null,
-      agentLogs: latestAgentLogs.map((log) => ({
-        id: log.id,
-        agentName: log.agentName,
-        response: log.response,
-      })),
+      agentLogs: latestAgentLogs.map((log) => {
+        const parsed = parseAgentResponseServer(log.response);
+        return {
+          id: log.id,
+          agentName: log.agentName,
+          analysis: typeof parsed.analysis === "string" ? parsed.analysis : undefined,
+          recommendations: Array.isArray(parsed.recommendations) ? parsed.recommendations as string[] : [],
+          flags: Array.isArray(parsed.flags) ? parsed.flags as string[] : [],
+        };
+      }),
     };
   });
 

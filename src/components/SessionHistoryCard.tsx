@@ -15,7 +15,10 @@ type Exercise = {
 type AgentLog = {
   id: number;
   agentName: string;
-  response: string;
+  // Pre-parsed fields (server extracts these; avoids raw JSON reaching the client)
+  analysis?: string;
+  recommendations?: string[];
+  flags?: string[];
 };
 
 type Recommendation = {
@@ -51,13 +54,6 @@ type Session = {
   agentLogs: AgentLog[];
 };
 
-type ParsedAgent = {
-  analysis?: string;
-  recommendations?: string[];
-  flags?: string[];
-  nextSession?: string;
-};
-
 const CYCLE_LABELS: Record<number, string> = { 1: "Push", 2: "Pull", 3: "Legs", 4: "Arms" };
 
 const RATING_BADGE: Record<string, string> = {
@@ -71,79 +67,6 @@ const AGENT_STYLES: Record<string, { border: string; badge: string; dot: string 
   Forge: { border: "border-amber-800", badge: "bg-amber-950 text-amber-300", dot: "bg-amber-400" },
   Lens:  { border: "border-emerald-800", badge: "bg-emerald-950 text-emerald-300", dot: "bg-emerald-400" },
 };
-
-/**
- * Escape literal control characters (newlines, tabs, CR) that appear inside
- * JSON string values. The LLM sometimes puts real newlines inside string fields
- * which makes the JSON invalid. This scanner respects string boundaries and
- * escape sequences so it only touches chars that are actually inside strings.
- */
-function sanitizeJsonControlChars(str: string): string {
-  let inString = false;
-  let escaped = false;
-  let result = "";
-  for (let i = 0; i < str.length; i++) {
-    const c = str[i];
-    if (escaped) { result += c; escaped = false; continue; }
-    if (c === "\\" && inString) { result += c; escaped = true; continue; }
-    if (c === '"') { result += c; inString = !inString; continue; }
-    if (inString) {
-      if (c === "\n") { result += "\\n"; continue; }
-      if (c === "\r") { result += "\\r"; continue; }
-      if (c === "\t") { result += "\\t"; continue; }
-    }
-    result += c;
-  }
-  return result;
-}
-
-function tryParse(candidate: string): ParsedAgent | null {
-  try { return JSON.parse(candidate) as ParsedAgent; } catch { /* continue */ }
-  try { return JSON.parse(sanitizeJsonControlChars(candidate)) as ParsedAgent; } catch { /* continue */ }
-  return null;
-}
-
-function parseAgentResponse(text: string): ParsedAgent {
-  // 1. Try parsing the whole text first (most common: LLM returns pure JSON)
-  const direct = tryParse(text.trim());
-  if (direct) return direct;
-
-  // 2. Try markdown fence (handles ```json ... ``` wrappers the LLM sometimes adds)
-  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (fenceMatch?.[1]) {
-    const fenced = tryParse(fenceMatch[1].trim());
-    if (fenced) return fenced;
-  }
-
-  // 3. Balanced-brace extraction: walk from the first `{` tracking depth,
-  //    respecting strings and escape sequences. Handles preamble text and
-  //    fences without a closing ```.
-  const start = text.indexOf("{");
-  if (start !== -1) {
-    let depth = 0;
-    let inString = false;
-    let escaped = false;
-    for (let i = start; i < text.length; i++) {
-      const c = text[i];
-      if (escaped) { escaped = false; continue; }
-      if (c === "\\" && inString) { escaped = true; continue; }
-      if (c === '"') { inString = !inString; continue; }
-      if (!inString) {
-        if (c === "{") depth++;
-        else if (c === "}") {
-          depth--;
-          if (depth === 0) {
-            const extracted = tryParse(text.slice(start, i + 1));
-            if (extracted) return extracted;
-            break;
-          }
-        }
-      }
-    }
-  }
-
-  return { analysis: text };
-}
 
 export function SessionHistoryCard({ session }: { session: Session }) {
   const [expanded, setExpanded] = useState(false);
@@ -165,10 +88,12 @@ export function SessionHistoryCard({ session }: { session: Session }) {
       if (!res.ok) throw new Error(data.error ?? "Analysis failed");
       setAnalysisResult({
         recommendation: data.recommendation,
-        agentLogs: data.agentResponses.map((r: { agentName: string; analysis: string; recommendations: string[]; latencyMs: number }, i: number) => ({
+        agentLogs: data.agentResponses.map((r: { agentName: string; analysis: string; recommendations: string[]; flags?: string[] }, i: number) => ({
           id: i,
           agentName: r.agentName,
-          response: JSON.stringify(r),
+          analysis: r.analysis,
+          recommendations: Array.isArray(r.recommendations) ? r.recommendations : [],
+          flags: Array.isArray(r.flags) ? r.flags : [],
         })),
       });
     } catch (err) {
@@ -323,7 +248,6 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             <div className="space-y-2">
               {displayAgentLogs.map((log) => {
                 const style = AGENT_STYLES[log.agentName] ?? AGENT_STYLES.Pulse;
-                const parsed = parseAgentResponse(log.response);
                 const isOpen = openAgent === `${session.id}-${log.agentName}`;
 
                 return (
@@ -343,14 +267,14 @@ export function SessionHistoryCard({ session }: { session: Session }) {
 
                     {isOpen && (
                       <div className="px-4 pb-4 space-y-3 text-sm border-t border-zinc-800 pt-3">
-                        {parsed.analysis ? (
-                          <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">{parsed.analysis}</p>
+                        {log.analysis ? (
+                          <p className="text-zinc-300 leading-relaxed whitespace-pre-wrap">{log.analysis}</p>
                         ) : null}
-                        {parsed.recommendations && parsed.recommendations.length > 0 && (
+                        {log.recommendations && log.recommendations.length > 0 && (
                           <div>
                             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1.5">Recommendations</p>
                             <ul className="space-y-1">
-                              {parsed.recommendations.map((r, i) => (
+                              {log.recommendations.map((r, i) => (
                                 <li key={i} className="text-zinc-300 flex gap-2">
                                   <span className="text-zinc-600 shrink-0">→</span> {r}
                                 </li>
