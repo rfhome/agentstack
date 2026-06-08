@@ -63,7 +63,7 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
 
   const msg = await client.messages.create({
     model: "claude-sonnet-4-6",
-    max_tokens: 1024,
+    max_tokens: 2048,
     system: NEXUS_SYSTEM_PROMPT,
     messages: [{ role: "user", content: nexusContent }],
   });

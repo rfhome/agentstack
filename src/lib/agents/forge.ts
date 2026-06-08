@@ -26,7 +26,7 @@ export async function runForge(input: AgentInput): Promise<AgentResponse> {
 
   const res = await client.chat.completions.create({
     model: "gpt-4o",
-    max_tokens: 1024,
+    max_tokens: 4096,
     response_format: { type: "json_object" },
     messages: [
       { role: "system", content: SYSTEM_PROMPT },

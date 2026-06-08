@@ -76,9 +76,12 @@ function parseAgentResponseServer(text: string): { analysis?: string; recommenda
     }
   }
 
-  // 4. Regex fallback — extract analysis field directly (handles completely malformed JSON)
-  const aMatch = text.match(/"analysis"\s*:\s*"((?:[^"\\]|\\[\s\S])*)"/);
-  if (aMatch) return { analysis: aMatch[1].replace(/\\n/g, "\n").replace(/\\t/g, "\t") };
+  // 4. Regex fallback — extract analysis field directly.
+  //    Two variants: closed string (normal) and open-ended (truncated response, no closing ").
+  const aMatchClosed = text.match(/"analysis"\s*:\s*"((?:[^"\\]|\\[\s\S])*)"/);
+  if (aMatchClosed) return { analysis: aMatchClosed[1].replace(/\\n/g, "\n").replace(/\\t/g, "\t") };
+  const aMatchOpen = text.match(/"analysis"\s*:\s*"((?:[^"\\]|\\[\s\S])*)/);
+  if (aMatchOpen?.[1]) return { analysis: aMatchOpen[1].replace(/\\n/g, "\n").replace(/\\t/g, "\t") + " [truncated]" };
 
   return { analysis: text };
 }
