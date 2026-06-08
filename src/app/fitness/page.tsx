@@ -10,6 +10,7 @@ import { RecommendationFeed } from "@/components/RecommendationFeed";
 import { GoalManager } from "@/components/GoalManager";
 import { WeeklySummary } from "@/components/WeeklySummary";
 import { StreaksCard } from "@/components/StreaksCard";
+import { ActivityDashboardSection } from "@/components/ActivityDashboardSection";
 
 export default async function FitnessPage() {
   const session = await auth();
@@ -85,6 +86,8 @@ export default async function FitnessPage() {
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Goals</h2>
         <GoalManager />
       </section>
+
+      <ActivityDashboardSection />
 
       <section>
         <div className="flex items-center justify-between mb-3">

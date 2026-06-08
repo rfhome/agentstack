@@ -6,7 +6,7 @@ import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
 import { checkRateLimit } from "@/lib/security";
-import type { AgentInput, SessionSummary, SessionImage } from "@/lib/agents/types";
+import type { AgentInput, SessionSummary, SessionImage, RecentActivity } from "@/lib/agents/types";
 
 function toSessionSummary(s: {
   date: Date;
@@ -70,7 +70,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "sessionId is required" }, { status: 400 });
     }
 
-    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn] = await withRLS(userId, (db) =>
+    const sessionDateCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn, recentActivitiesRaw] = await withRLS(userId, (db) =>
       Promise.all([
         db.session.findUnique({
           where: { id: sessionId, userId },
@@ -92,8 +94,24 @@ export async function POST(req: NextRequest) {
           where: { userId_provider: { userId, provider: "fitbit" } },
           select: { id: true },
         }),
+        db.activity.findMany({
+          where: { userId, date: { gte: sessionDateCutoff } },
+          orderBy: { date: "desc" },
+          take: 10,
+          select: { type: true, date: true, durationMin: true, distanceMi: true, avgHR: true, calories: true, notes: true },
+        }),
       ])
     );
+
+    const recentActivities: RecentActivity[] = recentActivitiesRaw.map((a) => ({
+      type: a.type,
+      date: a.date.toISOString().split("T")[0],
+      durationMin: a.durationMin,
+      distanceMi: a.distanceMi,
+      avgHR: a.avgHR,
+      calories: a.calories,
+      notes: a.notes,
+    }));
 
     if (!session) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
@@ -148,6 +166,7 @@ export async function POST(req: NextRequest) {
       userContext,
       ouraContext,
       fitbitContext,
+      recentActivities: recentActivities.length > 0 ? recentActivities : undefined,
       images: sessionImages.length > 0 ? sessionImages : undefined,
     };
 

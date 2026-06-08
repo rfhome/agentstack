@@ -181,6 +181,23 @@ model Feedback {
   createdAt DateTime @default(now())
 }
 
+// Standalone activities logged outside of gym sessions (running, pickleball, etc.)
+model Activity {
+  id           Int      @id @default(autoincrement())
+  userId       String
+  type         String   // e.g. "Running", "Pickleball", "Hiking"
+  date         DateTime
+  durationMin  Int?
+  distanceMi   Float?
+  avgHR        Int?
+  maxHR        Int?
+  calories     Int?
+  notes        String?
+  imageData    String?  // base64 — from wearable screenshot
+  imageMediaType String?
+  createdAt    DateTime @default(now())
+}
+
 // Transient store for images received via PWA Web Share Target.
 // Retrieved once by the log page, then deleted.
 model SharedUpload {

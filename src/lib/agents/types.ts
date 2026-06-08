@@ -30,6 +30,16 @@ export interface SessionImage {
   name: string;       // original filename
 }
 
+export interface RecentActivity {
+  type: string;
+  date: string;       // YYYY-MM-DD
+  durationMin: number | null;
+  distanceMi: number | null;
+  avgHR: number | null;
+  calories: number | null;
+  notes: string | null;
+}
+
 export interface AgentInput {
   sessionId?: number;
   userId?: string;
@@ -39,6 +49,7 @@ export interface AgentInput {
   userContext: string;
   ouraContext?: string;
   fitbitContext?: string;
+  recentActivities?: RecentActivity[]; // non-gym activities logged in the past 7 days
   images?: SessionImage[]; // workout screenshots (e.g. Fitbit HR chart, machine summary)
 }
 
