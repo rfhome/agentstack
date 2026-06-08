@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import { sendVerificationEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,6 +9,9 @@ export async function POST(req: NextRequest) {
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email and password required" }, { status: 400 });
+    }
+    if (password.length < 8) {
+      return NextResponse.json({ error: "Password must be at least 8 characters" }, { status: 400 });
     }
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -19,6 +23,16 @@ export async function POST(req: NextRequest) {
     const user = await prisma.user.create({
       data: { name, email, password: hashed },
     });
+
+    // Create a 24-hour verification token and send the email
+    const verification = await prisma.emailVerification.create({
+      data: {
+        userId: user.id,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      },
+    });
+
+    await sendVerificationEmail(email, verification.token);
 
     return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
   } catch (err) {

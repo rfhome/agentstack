@@ -103,8 +103,8 @@ const STEPS: Step[] = [
     options: [
       { id: "oura", label: "Oura Ring" },
       { id: "fitbit", label: "Fitbit / Google Fit" },
-      { id: "apple", label: "Apple Watch" },
-      { id: "garmin", label: "Garmin" },
+      { id: "apple", label: "Apple Watch", sub: "Coming soon — Oura & Fitbit are live today" },
+      { id: "garmin", label: "Garmin", sub: "Coming soon — Oura & Fitbit are live today" },
       { id: "none", label: "None" },
     ],
   },
@@ -301,7 +301,7 @@ export function OnboardingWizard({ hasProfile, existingProgramConfig, tier = "fr
           <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-4 space-y-3">
             <p className="text-sm font-medium text-white">Connect your wearables</p>
             <p className="text-xs text-zinc-400">
-              Give your agents live recovery and HR data — makes analysis and prescriptions much more accurate.
+              Give your agents live recovery and HR data — makes analysis and prescriptions much more accurate. Oura Ring and Fitbit are supported now; Apple Watch and Garmin integrations are coming soon.
             </p>
             <div className="flex flex-col gap-2">
               {selectedWearables.includes("oura") && (

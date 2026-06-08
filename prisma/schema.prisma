@@ -10,6 +10,7 @@ model User {
   id              String           @id @default(cuid())
   name            String?
   email           String           @unique
+  emailVerified   DateTime?
   password        String?
   tier            String           @default("free") // "free" | "beta" | "premium"
   accounts        Account[]
@@ -20,6 +21,14 @@ model User {
   profile         UserProfile?
   wearables       WearableConnection[]
   createdAt       DateTime         @default(now())
+}
+
+model EmailVerification {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }
 
 model PromoCode {
@@ -169,5 +178,16 @@ model Feedback {
   id        Int      @id @default(autoincrement())
   userId    String?
   content   String
+  createdAt DateTime @default(now())
+}
+
+// Transient store for images received via PWA Web Share Target.
+// Retrieved once by the log page, then deleted.
+model SharedUpload {
+  id        String   @id @default(cuid())
+  userId    String?
+  data      String   // base64-encoded image data
+  mediaType String
+  name      String   @default("shared-image")
   createdAt DateTime @default(now())
 }

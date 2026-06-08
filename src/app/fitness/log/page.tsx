@@ -174,6 +174,24 @@ export default function LogSessionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Pre-load image shared via PWA Web Share Target (?shareId=xxx)
+  useEffect(() => {
+    const shareId = searchParams.get("shareId");
+    if (!shareId) return;
+    fetch(`/api/share-target?id=${shareId}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d?.data) {
+          setImages((prev) => [
+            ...prev,
+            { data: d.data, mediaType: d.mediaType ?? "image/jpeg", name: d.name ?? "shared-image" },
+          ]);
+        }
+      })
+      .catch(() => { /* ignore — user can add image manually */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Load cycle structure from user's programConfig
   useEffect(() => {
     fetch("/api/profile")

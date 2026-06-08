@@ -2,11 +2,14 @@
 
 import { useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justVerified = searchParams.get("verified") === "1";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -38,6 +41,12 @@ export default function SignInPage() {
           <h1 className="text-2xl font-semibold text-white">Sign in</h1>
           <p className="mt-1 text-sm text-zinc-400">AgentStack — your personal AI stack</p>
         </div>
+
+        {justVerified && (
+          <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 px-4 py-3">
+            <p className="text-sm text-emerald-300">Email verified! Sign in to get started.</p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

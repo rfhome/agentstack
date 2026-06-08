@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -31,8 +30,8 @@ export default function SignUpPage() {
       return;
     }
 
-    await signIn("credentials", { email, password, redirect: false });
-    window.location.href = "/onboarding";
+    // Go to "check your email" — user must verify before signing in
+    router.push(`/auth/check-email?email=${encodeURIComponent(email)}`);
   }
 
   return (
