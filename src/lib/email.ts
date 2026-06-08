@@ -13,8 +13,10 @@ export async function sendVerificationEmail(to: string, token: string): Promise<
 
   const verifyUrl = `${process.env.AUTH_URL}/auth/verify/${token}`;
 
+  const from = process.env.AUTH_EMAIL_FROM ?? "AgentStack <onboarding@resend.dev>";
+
   await resend.emails.send({
-    from: "AgentStack <noreply@agentstack.catalystedgeconnect.com>",
+    from,
     to,
     subject: "Verify your AgentStack account",
     html: `
