@@ -1260,7 +1260,7 @@ function LogSessionPageInner() {
                   <button
                     type="button"
                     onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
-                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-600 text-zinc-400 hover:text-white text-xs flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-zinc-800 border border-zinc-600 text-zinc-400 hover:text-white text-xs flex items-center justify-center"
                   >
                     ×
                   </button>
