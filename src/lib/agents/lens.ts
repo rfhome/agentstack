@@ -22,9 +22,23 @@ export async function runLens(input: AgentInput): Promise<AgentResponse> {
     systemInstruction: SYSTEM_PROMPT,
   });
   const start = Date.now();
-  const prompt = wrapAgentInput(JSON.stringify(input, null, 2));
 
-  const res = await model.generateContent(prompt);
+  // Strip raw image data before serializing — base64 blobs in JSON text would
+  // blow past Gemini's token limit and silently kill the agent.
+  // Wearable context is already extracted into ouraContext / fitbitContext strings.
+  const { images: _images, ...inputWithoutImages } = input;
+  const prompt = wrapAgentInput(JSON.stringify(inputWithoutImages, null, 2));
+
+  // Pass wearable screenshots as proper Gemini inlineData parts (not embedded text)
+  type Part = { text: string } | { inlineData: { mimeType: string; data: string } };
+  const parts: Part[] = [{ text: prompt }];
+  if (input.images?.length) {
+    for (const img of input.images) {
+      parts.push({ inlineData: { mimeType: img.mediaType, data: img.data } });
+    }
+  }
+
+  const res = await model.generateContent(parts);
   const latencyMs = Date.now() - start;
   const text = res.response.text().trim();
 
