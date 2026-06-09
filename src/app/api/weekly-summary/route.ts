@@ -180,8 +180,7 @@ export async function POST() {
 
     return NextResponse.json(synthesis);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.error("[POST /api/weekly-summary]", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("[POST /api/weekly-summary]", err instanceof Error ? err.message : String(err));
+    return NextResponse.json({ error: "Failed to generate weekly summary" }, { status: 500 });
   }
 }

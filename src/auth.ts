@@ -28,6 +28,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           user.password
         );
         if (!valid) return null;
+        // Block sign-in until email is verified (emailVerified is set by /auth/verify/[token])
+        if (!user.emailVerified) return null;
         return { id: user.id, email: user.email, name: user.name };
       },
     }),
