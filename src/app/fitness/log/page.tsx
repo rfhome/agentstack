@@ -872,7 +872,7 @@ function LogSessionPageInner() {
                     setFocusedExercise(null);
                   }
                 }}
-                className={`rounded-lg border bg-zinc-900 p-3 space-y-2.5 transition-colors ${
+                className={`rounded-lg border bg-zinc-900 p-3 space-y-2.5 transition-colors overflow-hidden ${
                   focusedExercise === i ? "border-orange-500" : "border-zinc-800"
                 }`}
               >
