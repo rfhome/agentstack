@@ -14,6 +14,8 @@ type Session = {
   cycleNumber: number | null;
   durationMinutes: number | null;
   avgHeartRate: number | null;
+  cardioLoad: number | null;
+  activeZoneMinutes: number | null;
   rating: string | null;
   notes: string | null;
   exercises: Exercise[];
@@ -55,9 +57,11 @@ export function SessionCard({ session }: { session: Session }) {
         </div>
       </div>
 
-      <div className="flex gap-4 text-xs text-zinc-400">
-        {session.durationMinutes && <span>{session.durationMinutes}min</span>}
-        {session.avgHeartRate && <span>♥ {session.avgHeartRate}bpm</span>}
+      <div className="flex flex-wrap gap-3 text-xs text-zinc-400">
+        {session.durationMinutes && <span>{session.durationMinutes} min</span>}
+        {session.avgHeartRate && <span>♥ {session.avgHeartRate} bpm</span>}
+        {session.cardioLoad && <span>Load {session.cardioLoad}</span>}
+        {session.activeZoneMinutes && <span>AZM {session.activeZoneMinutes}</span>}
       </div>
 
       {session.exercises.length > 0 && (

@@ -603,7 +603,7 @@ function LogSessionPageInner() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs text-zinc-500">{new Date(date).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</p>
-              <p className="font-semibold text-white">{cycleLabel}{cycleNumber ? ` · Cycle ${cycleNumber}` : ""}</p>
+              <p className="font-semibold text-white">{cycleLabel}</p>
             </div>
             <div className="text-right text-xs text-zinc-500 space-y-0.5">
               {duration && <p>{duration} min</p>}
@@ -690,19 +690,11 @@ function LogSessionPageInner() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs text-zinc-500 mb-1">Cycle #</label>
-              <input type="number" value={cycleNumber} onChange={(e) => setCycleNumber(e.target.value)}
-                placeholder="e.g. 3" min="1"
-                className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
-            </div>
-            <div>
-              <label className="block text-xs text-zinc-500 mb-1">Duration (min)</label>
-              <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)}
-                placeholder="e.g. 55" min="1"
-                className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
-            </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1">Duration (min)</label>
+            <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)}
+              placeholder="e.g. 55" min="1"
+              className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600" />
           </div>
 
           {/* Fitbit fill button — shown as a full-width action row */}

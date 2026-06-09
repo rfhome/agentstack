@@ -97,9 +97,25 @@ export async function POST(req: NextRequest) {
       ? new Date(session.date).toISOString().split("T")[0]
       : new Date().toISOString().split("T")[0];
 
+    // Auto-calculate cycleNumber if not provided and cycleDay is set
+    let cycleNumber = session.cycleNumber;
+    if (!cycleNumber && session.cycleDay) {
+      const lastSameDay = await withRLS(authSession.user.id, (db) =>
+        db.session.findFirst({
+          where: { userId: authSession.user.id, cycleDay: session.cycleDay },
+          orderBy: { date: "desc" },
+          select: { cycleNumber: true },
+        })
+      );
+      cycleNumber = lastSameDay?.cycleNumber
+        ? lastSameDay.cycleNumber + 1
+        : 1;
+    }
+
     const created = await withRLS(authSession.user.id, (db) => db.session.create({
       data: {
         ...session,
+        cycleNumber,
         userId: authSession.user.id,
         date: session.date ? new Date(session.date + "T12:00:00.000Z") : new Date(),
         images: images && images.length > 0 ? JSON.parse(JSON.stringify(images)) : undefined,
