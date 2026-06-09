@@ -13,6 +13,11 @@ interface OuraStatus {
   error?: string;
 }
 
+interface AppleHealthStatus {
+  connected: boolean;
+  webhookUrl?: string;
+}
+
 interface FitbitHRZone {
   name: string;
   minutes: number;
@@ -34,6 +39,8 @@ function SettingsContent() {
   const searchParams = useSearchParams();
   const [ouraStatus, setOuraStatus] = useState<OuraStatus | null>(null);
   const [fitbitStatus, setFitbitStatus] = useState<FitbitStatus | null>(null);
+  const [appleHealth, setAppleHealth] = useState<AppleHealthStatus | null>(null);
+  const [urlCopied, setUrlCopied] = useState(false);
   const [tier, setTier] = useState<string>("free");
   const [promoCode, setPromoCode] = useState("");
   const [redeemState, setRedeemState] = useState<"idle" | "loading" | "success" | "error">("idle");
@@ -41,12 +48,9 @@ function SettingsContent() {
   const oauthError = searchParams.get("error");
 
   useEffect(() => {
-    fetch("/api/wearables/oura")
-      .then((r) => r.json())
-      .then(setOuraStatus);
-    fetch("/api/wearables/fitbit")
-      .then((r) => r.json())
-      .then(setFitbitStatus);
+    fetch("/api/wearables/oura").then((r) => r.json()).then(setOuraStatus);
+    fetch("/api/wearables/fitbit").then((r) => r.json()).then(setFitbitStatus);
+    fetch("/api/wearables/apple-health").then((r) => r.json()).then(setAppleHealth);
     fetch("/api/profile")
       .then((r) => r.json())
       .then((p: { tier?: string }) => { if (p.tier) setTier(p.tier); });
@@ -87,6 +91,19 @@ function SettingsContent() {
   async function disconnectFitbit() {
     await fetch("/api/wearables/fitbit", { method: "DELETE" });
     setFitbitStatus({ connected: false });
+  }
+
+  async function disconnectAppleHealth() {
+    await fetch("/api/wearables/apple-health", { method: "DELETE" });
+    // Re-fetch to get a fresh token/URL for reconnecting
+    fetch("/api/wearables/apple-health").then((r) => r.json()).then(setAppleHealth);
+  }
+
+  async function copyWebhookUrl() {
+    if (!appleHealth?.webhookUrl) return;
+    await navigator.clipboard.writeText(appleHealth.webhookUrl);
+    setUrlCopied(true);
+    setTimeout(() => setUrlCopied(false), 2000);
   }
 
   const scoreColor = (score: number | null) =>
@@ -237,6 +254,71 @@ function SettingsContent() {
               Connect Fitbit
             </a>
           </div>
+        )}
+      </section>
+
+      {/* Apple Health / Apple Watch */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-3">
+          <h2 className="text-base font-medium text-white">Apple Health</h2>
+          {appleHealth?.connected ? (
+            <span className="text-xs bg-emerald-900/40 text-emerald-400 px-2 py-0.5 rounded-full">Connected</span>
+          ) : (
+            <span className="text-xs bg-zinc-800 text-zinc-500 px-2 py-0.5 rounded-full">Not connected</span>
+          )}
+        </div>
+
+        <p className="text-sm text-zinc-400">
+          Stream Apple Watch workouts, HRV, sleep, and resting HR into AgentStack via{" "}
+          <a href="https://www.healthexportapp.com" target="_blank" rel="noopener noreferrer"
+            className="text-zinc-300 underline underline-offset-2 hover:text-white">
+            Health Auto Export
+          </a>{" "}
+          (free / $4 one-time). No Apple Developer account needed.
+        </p>
+
+        {appleHealth?.webhookUrl && (
+          <div className="space-y-3">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 space-y-2">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Your webhook URL</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-xs text-zinc-300 font-mono truncate">
+                  {appleHealth.webhookUrl}
+                </code>
+                <button
+                  onClick={copyWebhookUrl}
+                  className="shrink-0 rounded-md bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-xs text-zinc-300 hover:text-white px-3 py-1.5 transition-colors"
+                >
+                  {urlCopied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4 space-y-2 text-sm text-zinc-400">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Setup in Health Auto Export</p>
+              <ol className="list-decimal list-inside space-y-1.5 text-xs">
+                <li>Open <strong className="text-zinc-300">Health Auto Export</strong> → Automations → Add Automation</li>
+                <li>Set <strong className="text-zinc-300">Export type</strong> to <em>REST API</em></li>
+                <li>Paste your webhook URL above as the <strong className="text-zinc-300">URL</strong></li>
+                <li>Select metrics: <strong className="text-zinc-300">Heart Rate Variability, Resting Heart Rate, Sleep Analysis, Active Energy Burned, Step Count</strong></li>
+                <li>Enable <strong className="text-zinc-300">Workouts</strong> to sync Apple Watch workouts automatically</li>
+                <li>Set frequency to <em>Daily</em> or <em>After every workout</em></li>
+              </ol>
+            </div>
+          </div>
+        )}
+
+        {appleHealth === null && (
+          <div className="text-sm text-zinc-500">Loading...</div>
+        )}
+
+        {appleHealth?.connected && (
+          <button
+            onClick={disconnectAppleHealth}
+            className="text-sm text-zinc-500 hover:text-red-400 transition-colors"
+          >
+            Disconnect Apple Health
+          </button>
         )}
       </section>
 

@@ -5,6 +5,7 @@ import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
+import { formatAppleHealthForLens } from "@/lib/apple-health";
 import { checkRateLimit } from "@/lib/security";
 import type { AgentInput, SessionSummary, SessionImage, RecentActivity } from "@/lib/agents/types";
 
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     const sessionDateCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn, recentActivitiesRaw] = await withRLS(userId, (db) =>
+    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn, recentActivitiesRaw, appleHealthDays] = await withRLS(userId, (db) =>
       Promise.all([
         db.session.findUnique({
           where: { id: sessionId, userId },
@@ -99,6 +100,11 @@ export async function POST(req: NextRequest) {
           orderBy: { date: "desc" },
           take: 10,
           select: { type: true, date: true, durationMin: true, distanceMi: true, avgHR: true, calories: true, notes: true },
+        }),
+        db.appleHealthDay.findMany({
+          where: { userId, date: { gte: sessionDateCutoff.toISOString().slice(0, 10) } },
+          orderBy: { date: "desc" },
+          take: 7,
         }),
       ])
     );
@@ -166,6 +172,16 @@ export async function POST(req: NextRequest) {
       userContext,
       ouraContext,
       fitbitContext,
+      appleHealthContext: appleHealthDays.length > 0
+        ? formatAppleHealthForLens(appleHealthDays.map(d => ({
+            date: d.date,
+            hrv:        d.hrv        ?? undefined,
+            restingHR:  d.restingHR  ?? undefined,
+            sleepHours: d.sleepHours ?? undefined,
+            activeKcal: d.activeKcal ?? undefined,
+            steps:      d.steps      ?? undefined,
+          })))
+        : undefined,
       recentActivities: recentActivities.length > 0 ? recentActivities : undefined,
       images: sessionImages.length > 0 ? sessionImages : undefined,
     };

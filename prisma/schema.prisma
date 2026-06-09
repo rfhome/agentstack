@@ -198,6 +198,23 @@ model Activity {
   createdAt    DateTime @default(now())
 }
 
+// Daily Apple Health summary received via Health Auto Export webhook.
+// One row per user per day — upserted on each webhook delivery.
+model AppleHealthDay {
+  id          Int      @id @default(autoincrement())
+  userId      String
+  date        String   // YYYY-MM-DD
+  hrv         Float?   // ms — heart rate variability
+  restingHR   Int?     // bpm
+  sleepHours  Float?   // hours of total sleep
+  activeKcal  Int?     // active energy burned
+  steps       Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, date])
+}
+
 // Transient store for images received via PWA Web Share Target.
 // Retrieved once by the log page, then deleted.
 model SharedUpload {

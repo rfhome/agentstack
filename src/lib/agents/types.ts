@@ -49,6 +49,7 @@ export interface AgentInput {
   userContext: string;
   ouraContext?: string;
   fitbitContext?: string;
+  appleHealthContext?: string;          // formatted Apple Health daily summaries (last 7 days)
   recentActivities?: RecentActivity[]; // non-gym activities logged in the past 7 days
   images?: SessionImage[]; // workout screenshots (e.g. Fitbit HR chart, machine summary)
 }

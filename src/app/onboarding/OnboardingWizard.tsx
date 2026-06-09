@@ -103,8 +103,8 @@ const STEPS: Step[] = [
     options: [
       { id: "oura", label: "Oura Ring" },
       { id: "fitbit", label: "Fitbit / Google Fit" },
-      { id: "apple", label: "Apple Watch", sub: "Coming soon — Oura & Fitbit are live today" },
-      { id: "garmin", label: "Garmin", sub: "Coming soon — Oura & Fitbit are live today" },
+      { id: "apple", label: "Apple Watch", sub: "Connect via Health Auto Export — setup takes 2 min" },
+      { id: "garmin", label: "Garmin", sub: "Coming soon — Oura, Fitbit & Apple Watch are live today" },
       { id: "none", label: "None" },
     ],
   },
@@ -297,11 +297,11 @@ export function OnboardingWizard({ hasProfile, existingProgramConfig, tier = "fr
         </p>
 
         {/* Wearable connect step — only for beta/premium users who said they have wearables */}
-        {tier !== "free" && (selectedWearables.includes("oura") || selectedWearables.includes("fitbit")) && (
+        {tier !== "free" && (selectedWearables.includes("oura") || selectedWearables.includes("fitbit") || selectedWearables.includes("apple")) && (
           <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-4 space-y-3">
             <p className="text-sm font-medium text-white">Connect your wearables</p>
             <p className="text-xs text-zinc-400">
-              Give your agents live recovery and HR data — makes analysis and prescriptions much more accurate. Oura Ring and Fitbit are supported now; Apple Watch and Garmin integrations are coming soon.
+              Give your agents live recovery and HR data — makes analysis and prescriptions much more accurate. Oura Ring, Fitbit, and Apple Watch are all supported. Head to Settings after this to complete Apple Watch setup.
             </p>
             <div className="flex flex-col gap-2">
               {selectedWearables.includes("oura") && (
