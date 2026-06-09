@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 // ---------------------------------------------------------------------------
 // Lightweight markdown renderer — handles the patterns the training context
@@ -211,6 +212,15 @@ export default function ProfilePage() {
             <p className="text-sm text-red-400">Failed to save. Please try again.</p>
           )}
         </div>
+      </div>
+
+      <div className="border-t border-zinc-800 pt-4">
+        <Link
+          href="/onboarding"
+          className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          ↺ Redo setup wizard
+        </Link>
       </div>
     </div>
   );
