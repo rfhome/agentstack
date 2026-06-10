@@ -3,8 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { withRLS } from "@/lib/prisma-rls";
-import { SessionHistoryCard } from "@/components/SessionHistoryCard";
-import { ActivityDashboardSection } from "@/components/ActivityDashboardSection";
+import { HistoryTabs } from "@/components/HistoryTabs";
 
 const AGENT_NAMES = ["Pulse", "Forge", "Lens"];
 
@@ -170,34 +169,12 @@ export default async function SessionsPage() {
     };
   });
 
+  const serializedActivities = activities.map((a) => ({ ...a, date: a.date.toISOString() }));
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">History</h1>
-
-      {/* Sessions */}
-      <section>
-        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Sessions</h2>
-        {serialized.length === 0 ? (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-            <p className="text-zinc-400 text-sm">No sessions logged yet.</p>
-            <p className="text-zinc-600 text-xs mt-1">Head to Fitness and log your first session.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {serialized.map((s) => (
-              <SessionHistoryCard key={s.id} session={s} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Activities */}
-      <section id="activities">
-        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Activities</h2>
-        <ActivityDashboardSection
-          activities={activities.map((a) => ({ ...a, date: a.date.toISOString() }))}
-        />
-      </section>
+      <HistoryTabs sessions={serialized} activities={serializedActivities} />
     </div>
   );
 }

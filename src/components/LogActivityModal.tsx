@@ -55,29 +55,31 @@ export function LogActivityModal({ onSaved }: { onSaved: (a: SavedActivity) => v
       const mediaType = prefix.match(/:(.*?);/)?.[1] ?? "image/jpeg";
       setImage({ data, mediaType });
 
-      // Auto-analyze if no metrics filled in yet
+      // Auto-analyze photo — uses a read-only endpoint that runs Gemini
+      // but does NOT save to the DB (saving happens only when user clicks Save)
       if (!duration && !avgHR) {
         setAnalyzing(true);
         try {
-          const res = await fetch("/api/activities", {
+          const res = await fetch("/api/activities/analyze", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              type: type === "Other" ? (customType || "activity") : (type || "activity"),
-              date,
               imageData: data,
               imageMediaType: mediaType,
+              activityType: type === "Other" ? (customType || "activity") : (type || "activity"),
             }),
           });
           if (res.ok) {
-            const saved = await res.json() as SavedActivity;
-            if (saved.durationMin) setDuration(String(saved.durationMin));
-            if (saved.distanceMi)  setDistance(String(saved.distanceMi));
-            if (saved.avgHR)       setAvgHR(String(saved.avgHR));
-            if (saved.calories)    setCalories(String(saved.calories));
-            // Don't close — let user review + confirm
-            setAnalyzing(false);
-            return;
+            const metrics = await res.json() as {
+              durationMinutes: number | null;
+              distanceMiles: number | null;
+              avgHeartRate: number | null;
+              calories: number | null;
+            };
+            if (metrics.durationMinutes) setDuration(String(metrics.durationMinutes));
+            if (metrics.distanceMiles)   setDistance(String(metrics.distanceMiles));
+            if (metrics.avgHeartRate)    setAvgHR(String(metrics.avgHeartRate));
+            if (metrics.calories)        setCalories(String(metrics.calories));
           }
         } catch { /* ignore — user fills manually */ }
         setAnalyzing(false);

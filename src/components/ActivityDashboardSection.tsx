@@ -25,7 +25,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-export function ActivityDashboardSection({ activities }: { activities: Activity[] }) {
+export function ActivityDashboardSection({ activities, hideViewAll }: { activities: Activity[]; hideViewAll?: boolean }) {
   if (activities.length === 0) {
     return (
       <p className="text-zinc-500 text-sm">
@@ -64,9 +64,11 @@ export function ActivityDashboardSection({ activities }: { activities: Activity[
         );
       })}
 
-      <Link href="/fitness/sessions#activities" className="block text-xs text-zinc-500 hover:text-zinc-300 transition-colors pt-1">
-        View all activities →
-      </Link>
+      {!hideViewAll && (
+        <Link href="/fitness/sessions#activities" className="block text-xs text-zinc-500 hover:text-zinc-300 transition-colors pt-1">
+          View all activities →
+        </Link>
+      )}
     </div>
   );
 }
