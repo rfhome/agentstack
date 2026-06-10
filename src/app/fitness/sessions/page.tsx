@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { withRLS } from "@/lib/prisma-rls";
 import { SessionHistoryCard } from "@/components/SessionHistoryCard";
+import { ActivityDashboardSection } from "@/components/ActivityDashboardSection";
 
 const AGENT_NAMES = ["Pulse", "Forge", "Lens"];
 
@@ -91,28 +92,27 @@ export default async function SessionsPage() {
   if (!session?.user?.id) redirect("/auth/signin");
   const userId = session.user.id;
 
-  const sessions = await withRLS(userId, (db) => db.session.findMany({
-    where: { userId },
-    orderBy: { date: "desc" },
-    include: {
-      exercises: true,
-      cardioActivities: true,
-      recommendations: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-      agentLogs: {
-        where: { agentName: { in: AGENT_NAMES } },
-        orderBy: { createdAt: "desc" },
-        select: {
-          id: true,
-          agentName: true,
-          response: true,
-          createdAt: true,
+  const [sessions, activities] = await withRLS(userId, (db) => Promise.all([
+    db.session.findMany({
+      where: { userId },
+      orderBy: { date: "desc" },
+      include: {
+        exercises: true,
+        cardioActivities: true,
+        recommendations: { orderBy: { createdAt: "desc" }, take: 1 },
+        agentLogs: {
+          where: { agentName: { in: AGENT_NAMES } },
+          orderBy: { createdAt: "desc" },
+          select: { id: true, agentName: true, response: true, createdAt: true },
         },
       },
-    },
-  }));
+    }),
+    db.activity.findMany({
+      where: { userId },
+      orderBy: { date: "desc" },
+      select: { id: true, type: true, date: true, durationMin: true, distanceMi: true, avgHR: true, calories: true, notes: true },
+    }),
+  ]));
 
   const serialized = sessions.map((s) => {
     const seenAgents = new Set<string>();
@@ -171,21 +171,33 @@ export default async function SessionsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-white">Session History</h1>
+    <div className="space-y-8">
+      <h1 className="text-2xl font-bold text-white">History</h1>
 
-      {serialized.length === 0 ? (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-          <p className="text-zinc-400 text-sm">No sessions logged yet.</p>
-          <p className="text-zinc-600 text-xs mt-1">Head to Fitness and log your first session.</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {serialized.map((s) => (
-            <SessionHistoryCard key={s.id} session={s} />
-          ))}
-        </div>
-      )}
+      {/* Sessions */}
+      <section>
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Sessions</h2>
+        {serialized.length === 0 ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
+            <p className="text-zinc-400 text-sm">No sessions logged yet.</p>
+            <p className="text-zinc-600 text-xs mt-1">Head to Fitness and log your first session.</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {serialized.map((s) => (
+              <SessionHistoryCard key={s.id} session={s} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Activities */}
+      <section id="activities">
+        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Activities</h2>
+        <ActivityDashboardSection
+          activities={activities.map((a) => ({ ...a, date: a.date.toISOString() }))}
+        />
+      </section>
     </div>
   );
 }

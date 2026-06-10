@@ -10,18 +10,20 @@ import { RecommendationFeed } from "@/components/RecommendationFeed";
 import { GoalManager } from "@/components/GoalManager";
 import { WeeklySummary } from "@/components/WeeklySummary";
 import { StreaksCard } from "@/components/StreaksCard";
+import { CollapsibleSection } from "@/components/CollapsibleSection";
 import { ActivityDashboardSection } from "@/components/ActivityDashboardSection";
+import { LogActivityButton } from "@/components/LogActivityButton";
 
 export default async function FitnessPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/signin");
   const userId = session.user.id;
 
-  const [sessions, recommendations, goals, profile] = await withRLS(userId, (db) =>
+  const [sessions, recommendations, profile, recentActivities] = await withRLS(userId, (db) =>
     Promise.all([
       db.session.findMany({
         where: { userId },
-        take: 10,
+        take: 4,
         orderBy: { date: "desc" },
         include: {
           exercises: true,
@@ -34,21 +36,30 @@ export default async function FitnessPage() {
         orderBy: { createdAt: "desc" },
         include: { session: { select: { cycleDay: true, rating: true } } },
       }),
-      Promise.resolve([]), // goals now fetched client-side by GoalManager
       db.userProfile.findFirst({ where: { userId } }),
+      db.activity.findMany({
+        where: { userId },
+        orderBy: { date: "desc" },
+        take: 4,
+        select: { id: true, type: true, date: true, durationMin: true, distanceMi: true, avgHR: true, calories: true, notes: true },
+      }),
     ])
   );
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">Fitness</h1>
-        <Link
-          href="/fitness/log"
-          className="rounded-lg bg-white text-zinc-950 px-4 py-2 text-sm font-semibold hover:bg-zinc-200 transition-colors"
-        >
-          Log Session
-        </Link>
+        <div className="flex items-center gap-2">
+          <LogActivityButton />
+          <Link
+            href="/fitness/log"
+            className="rounded-lg bg-white text-zinc-950 px-4 py-2 text-sm font-semibold hover:bg-zinc-200 transition-colors"
+          >
+            Log Session
+          </Link>
+        </div>
       </div>
 
       {!profile?.onboardingComplete && (
@@ -63,6 +74,7 @@ export default async function FitnessPage() {
         </div>
       )}
 
+      {/* Your Stats — always visible */}
       <section>
         <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Your Stats</h2>
         <Suspense fallback={null}>
@@ -70,37 +82,40 @@ export default async function FitnessPage() {
         </Suspense>
       </section>
 
-      <section>
-        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">This Week</h2>
+      {/* This Week — collapsible */}
+      <CollapsibleSection title="This Week">
         <Suspense fallback={null}>
           <WeeklySummary />
         </Suspense>
-      </section>
+      </CollapsibleSection>
 
-      <section>
-        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Recommendations</h2>
+      {/* Recommendations — collapsible */}
+      <CollapsibleSection title="Recommendations">
         <RecommendationFeed recommendations={recommendations} />
-      </section>
+      </CollapsibleSection>
 
-      <section>
-        <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-3">Goals</h2>
+      {/* Goals — collapsible */}
+      <CollapsibleSection title="Goals">
         <GoalManager />
-      </section>
+      </CollapsibleSection>
 
-      <ActivityDashboardSection />
+      {/* Recent Activities — last 4, server-fetched */}
+      <CollapsibleSection title="Recent Activities">
+        <ActivityDashboardSection
+          activities={recentActivities.map((a) => ({ ...a, date: a.date.toISOString() }))}
+        />
+      </CollapsibleSection>
 
-      <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Recent Sessions</h2>
+      {/* Recent Sessions — last 4, collapsible */}
+      <CollapsibleSection
+        title="Recent Sessions"
+        headerRight={
           <div className="flex items-center gap-4">
-            <Link href="/fitness/progress" className="text-xs text-zinc-400 hover:text-white transition-colors">
-              Progress →
-            </Link>
-            <Link href="/fitness/sessions" className="text-xs text-zinc-400 hover:text-white transition-colors">
-              View all →
-            </Link>
+            <Link href="/fitness/progress" className="text-xs text-zinc-400 hover:text-white transition-colors">Progress →</Link>
+            <Link href="/fitness/sessions" className="text-xs text-zinc-400 hover:text-white transition-colors">View all →</Link>
           </div>
-        </div>
+        }
+      >
         {sessions.length === 0 ? (
           <p className="text-zinc-500 text-sm">No sessions yet.</p>
         ) : (
@@ -113,7 +128,7 @@ export default async function FitnessPage() {
             ))}
           </div>
         )}
-      </section>
+      </CollapsibleSection>
     </div>
   );
 }

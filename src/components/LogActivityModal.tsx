@@ -19,11 +19,16 @@ type SavedActivity = {
   notes: string | null;
 };
 
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export function LogActivityModal({ onSaved }: { onSaved: (a: SavedActivity) => void }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("");
   const [customType, setCustomType] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(localToday);
   const [duration, setDuration] = useState("");
   const [distance, setDistance] = useState("");
   const [avgHR, setAvgHR] = useState("");
@@ -37,7 +42,7 @@ export function LogActivityModal({ onSaved }: { onSaved: (a: SavedActivity) => v
 
   function handleClose() {
     setOpen(false);
-    setType(""); setCustomType(""); setDate(new Date().toISOString().split("T")[0]);
+    setType(""); setCustomType(""); setDate(localToday());
     setDuration(""); setDistance(""); setAvgHR(""); setCalories(""); setNotes("");
     setImage(null); setError("");
   }
