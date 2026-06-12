@@ -21,7 +21,9 @@ export async function GET() {
   const baseUrl = process.env.NEXTAUTH_URL ?? process.env.AUTH_URL ?? "";
 
   if (!conn) {
-    // Auto-create the connection record with a fresh token so the URL is ready immediately
+    // Auto-create the connection record with a fresh token so the URL is ready immediately.
+    // We return connected:false here — the record existing just means the URL was generated,
+    // not that the user has set up the webhook and data is flowing.
     const token = crypto.randomUUID().replace(/-/g, "");
     await withRLS(userId, (db) =>
       db.wearableConnection.create({
@@ -34,8 +36,16 @@ export async function GET() {
     });
   }
 
+  // Only report as connected once at least one day of Apple Health data has been received.
+  // This prevents the auto-created record (generated on first settings visit) from showing
+  // as "Connected" for users who haven't set up Health Auto Export.
+  const hasData = await prisma.appleHealthDay.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+
   return NextResponse.json({
-    connected: true,
+    connected: !!hasData,
     webhookUrl: `${baseUrl}/api/wearables/apple-health/ingest?token=${conn.accessToken}`,
   });
 }
