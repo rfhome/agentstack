@@ -22,7 +22,10 @@ Return only valid JSON matching this exact structure, no markdown, no preamble:
 export async function runForge(input: AgentInput): Promise<AgentResponse> {
   const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   const start = Date.now();
-  const prompt = wrapAgentInput(JSON.stringify(input, null, 2));
+  // Strip image data before serializing — GPT-4o receives text-only; base64 blobs
+  // embedded in JSON text would blow the context window and cause the request to fail.
+  const { images: _images, ...inputWithoutImages } = input;
+  const prompt = wrapAgentInput(JSON.stringify(inputWithoutImages, null, 2));
 
   const res = await client.chat.completions.create({
     model: "gpt-4o",

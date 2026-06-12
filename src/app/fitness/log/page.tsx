@@ -16,6 +16,7 @@ type CardioEntry = {
   maxHR: string;
   analyzing: boolean;
   analyzed: boolean;
+  photoError: boolean;
 };
 type CheckItem = { label: string; done: boolean };
 type AgentResponse = {
@@ -164,6 +165,7 @@ function LogSessionPageInner() {
             maxHR: c.maxHR != null ? String(c.maxHR) : "",
             analyzing: false,
             analyzed: false,
+            photoError: false,
           })));
         }
         if (s.images?.length) {
@@ -255,7 +257,7 @@ function LogSessionPageInner() {
     setExercises(draft.exercises.length ? draft.exercises : [emptyExercise()]);
     setWarmupItems(draft.warmupItems);
     setFinisherItems(draft.finisherItems);
-    setCardioEntries(draft.cardioEntries.map((c) => ({ ...c, analyzing: false })));
+    setCardioEntries(draft.cardioEntries.map((c) => ({ ...c, analyzing: false, photoError: false })));
     setShowDraftBanner(false);
   }
 
@@ -398,13 +400,30 @@ function LogSessionPageInner() {
         setAnalyzeStep((s) => (s + 1) % ANALYZING_STEPS.length);
       }, 3000);
 
-      const analyzeRes = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId }),
-      });
+      const abortCtrl = new AbortController();
+      const abortTimer = setTimeout(() => abortCtrl.abort(), 120_000);
+
+      let analyzeRes: Response;
+      try {
+        analyzeRes = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId }),
+          signal: abortCtrl.signal,
+        });
+      } catch (fetchErr) {
+        clearInterval(interval);
+        clearTimeout(abortTimer);
+        const isTimeout = fetchErr instanceof DOMException && fetchErr.name === "AbortError";
+        throw new Error(
+          isTimeout
+            ? "Analysis timed out. Your session was saved — try again from History."
+            : "Could not reach the server. Your session was saved — check your connection and try again."
+        );
+      }
 
       clearInterval(interval);
+      clearTimeout(abortTimer);
       const data = await analyzeRes.json();
       if (!analyzeRes.ok) throw new Error(data.error ?? "Analysis failed");
 
@@ -961,7 +980,7 @@ function LogSessionPageInner() {
               onClick={() =>
                 setCardioEntries((prev) => [
                   ...prev,
-                  { tag: "", machine: "", durationMin: "", distanceMi: "", calories: "", avgHR: "", maxHR: "", analyzing: false, analyzed: false },
+                  { tag: "", machine: "", durationMin: "", distanceMi: "", calories: "", avgHR: "", maxHR: "", analyzing: false, analyzed: false, photoError: false },
                 ])
               }
               className="rounded-lg bg-zinc-800 border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors"
@@ -1012,10 +1031,14 @@ function LogSessionPageInner() {
                       )
                     );
                   } else {
-                    updateCardio("analyzing", false);
+                    setCardioEntries((prev) =>
+                      prev.map((c, idx) => idx === i ? { ...c, analyzing: false, photoError: true } : c)
+                    );
                   }
                 } catch {
-                  updateCardio("analyzing", false);
+                  setCardioEntries((prev) =>
+                    prev.map((c, idx) => idx === i ? { ...c, analyzing: false, photoError: true } : c)
+                  );
                 }
               }
 
@@ -1071,24 +1094,33 @@ function LogSessionPageInner() {
 
                   {/* Photo upload — only when both tag and machine selected */}
                   {entry.tag && entry.machine && (
-                    <div>
-                      <label className="inline-flex items-center gap-2 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs text-zinc-300 hover:text-white hover:border-zinc-500 transition-colors">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className={`inline-flex items-center gap-2 cursor-pointer rounded-lg border px-3 py-1.5 text-xs transition-colors ${
+                        entry.photoError
+                          ? "border-red-700 bg-red-900/20 text-red-400 hover:text-red-300"
+                          : "border-zinc-700 bg-zinc-800 text-zinc-300 hover:text-white hover:border-zinc-500"
+                      }`}>
                         {entry.analyzing ? (
                           <>
                             <span className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" />
                             Analyzing...
                           </>
+                        ) : entry.photoError ? (
+                          <>⚠ Analysis failed — try again</>
                         ) : (
-                          <>
-                            {entry.analyzed ? "Re-analyze screen photo" : "Analyze screen photo"}
-                          </>
+                          <>{entry.analyzed ? "Re-analyze screen photo" : "Analyze screen photo"}</>
                         )}
                         <input
                           type="file"
                           accept="image/*"
                           className="hidden"
                           disabled={entry.analyzing}
-                          onChange={handleCardioPhoto}
+                          onChange={(e) => {
+                            setCardioEntries((prev) =>
+                              prev.map((c, idx) => idx === i ? { ...c, photoError: false } : c)
+                            );
+                            handleCardioPhoto(e);
+                          }}
                         />
                       </label>
                     </div>
