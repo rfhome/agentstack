@@ -96,7 +96,16 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 Required: `DATABASE_URL`, `AUTH_SECRET`, `AUTH_URL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`  
 Wearables: `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET`, `FITBIT_CLIENT_ID`, `FITBIT_CLIENT_SECRET`  
 Google Sign-In: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`  
+Email: `RESEND_API_KEY`, `AUTH_EMAIL_FROM` (optional, defaults to `AgentStack <onboarding@resend.dev>`)  
+Admin gate: `ADMIN_EMAIL` — email address of the admin user; new signups are notified to this address and admin can approve at `/admin`  
 Railway: also needs `AUTH_TRUST_HOST=true`
+
+### Auth gate
+- All new signups (credentials + Google OAuth) default to `User.status = "pending"` and cannot access protected routes until approved
+- Admin approves at `/admin` — sets `status = "active"` and assigns tier; triggers approval email via Resend
+- `src/lib/auth-guard.ts` exports `requireActive()` — used in fitness/settings/profile/onboarding layouts
+- Google OAuth new users are created in DB via `signIn` callback in `auth.ts` (no NextAuth adapter); JWT is patched to use DB cuid (not Google sub) so `userId` is consistent with credentials users
+- Forgot password flow: `POST /api/auth/forgot-password` → `PasswordResetToken` model (1h TTL) → Resend email → `POST /api/auth/reset-password` → clears token
 
 ### dotenv in scripts
 Scripts that run outside Next.js must use `config({ path: ".env.local", override: true })` — shell environment may have empty API keys that would otherwise block dotenv.

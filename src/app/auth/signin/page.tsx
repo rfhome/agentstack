@@ -9,6 +9,7 @@ function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const justVerified = searchParams.get("verified") === "1";
+  const justReset = searchParams.get("reset") === "1";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,7 +45,13 @@ function SignInForm() {
 
         {justVerified && (
           <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 px-4 py-3">
-            <p className="text-sm text-emerald-300">Email verified! Sign in to get started.</p>
+            <p className="text-sm text-emerald-300">Email verified! Your account is awaiting approval.</p>
+          </div>
+        )}
+
+        {justReset && (
+          <div className="rounded-lg border border-emerald-800 bg-emerald-900/20 px-4 py-3">
+            <p className="text-sm text-emerald-300">Password updated. Sign in with your new password.</p>
           </div>
         )}
 
@@ -68,6 +75,11 @@ function SignInForm() {
               required
               className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
             />
+            <div className="mt-1 text-right">
+              <Link href="/auth/forgot-password" className="text-xs text-zinc-500 hover:text-zinc-300">
+                Forgot password?
+              </Link>
+            </div>
           </div>
 
           {error && <p className="text-sm text-red-400">{error}</p>}

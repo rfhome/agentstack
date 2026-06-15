@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { sendVerificationEmail } from "@/lib/email";
+import { sendVerificationEmail, sendAdminNewUserEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,10 +21,9 @@ export async function POST(req: NextRequest) {
 
     const hashed = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
-      data: { name, email, password: hashed },
+      data: { name, email, password: hashed, status: "pending" },
     });
 
-    // Create a 24-hour verification token and send the email
     const verification = await prisma.emailVerification.create({
       data: {
         userId: user.id,
@@ -33,6 +32,11 @@ export async function POST(req: NextRequest) {
     });
 
     await sendVerificationEmail(email, verification.token);
+
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      await sendAdminNewUserEmail(adminEmail, email, name ?? "").catch(console.error);
+    }
 
     return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
   } catch (err) {

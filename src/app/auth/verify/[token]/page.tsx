@@ -22,7 +22,7 @@ export default async function VerifyPage({
       select: { emailVerified: true },
     });
     if (user?.emailVerified) {
-      redirect("/auth/signin?verified=1");
+      redirect("/auth/pending");
     }
   }
 
@@ -52,5 +52,5 @@ export default async function VerifyPage({
   });
   await prisma.emailVerification.delete({ where: { token } });
 
-  redirect("/auth/signin?verified=1");
+  redirect("/auth/pending");
 }

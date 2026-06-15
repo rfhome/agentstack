@@ -26,9 +26,11 @@
 - [x] Suggested rating shown after analysis — user can accept or override before it's saved
 
 ### Auth
-- [x] Email + password sign-up / sign-in
+- [x] Email + password sign-up / sign-in with email verification
 - [x] Google OAuth sign-in
 - [x] All data scoped to authenticated user
+- [x] Forgot password — email link via Resend, 1-hour token, new password form at `/auth/reset-password`
+- [x] Admin approval gate — new signups (credentials + Google) start as `status: "pending"`; admin receives email notification and approves at `/admin` with tier assignment; user receives approval email; pending users are held at `/auth/pending` and cannot access any protected route until approved
 
 ### Wearables
 - [x] Oura Ring OAuth 2.0 — readiness, HRV, sleep score, deep/REM sleep, temperature deviation

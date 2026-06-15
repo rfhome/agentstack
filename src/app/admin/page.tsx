@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { ApprovePanel } from "@/components/ApprovePanel";
 
 export default async function AdminPage() {
   const adminEmail = process.env.ADMIN_EMAIL;
@@ -11,7 +12,7 @@ export default async function AdminPage() {
     redirect("/fitness");
   }
 
-  const [feedback, errorLogs, recentUsers] = await Promise.all([
+  const [feedback, errorLogs, pendingUsers, recentUsers] = await Promise.all([
     prisma.feedback.findMany({
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -23,15 +24,37 @@ export default async function AdminPage() {
       select: { id: true, agentName: true, createdAt: true, userId: true, sessionId: true },
     }),
     prisma.user.findMany({
+      where: { status: "pending" },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, name: true, email: true, createdAt: true, tier: true },
+    }),
+    prisma.user.findMany({
+      where: { status: "active" },
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: { id: true, name: true, email: true, createdAt: true },
+      select: { id: true, name: true, email: true, createdAt: true, tier: true },
     }),
   ]);
 
   return (
     <div className="space-y-10">
       <h1 className="text-2xl font-bold text-white">Admin</h1>
+
+      {/* Pending approvals */}
+      <section className="space-y-3">
+        <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
+          Pending approval ({pendingUsers.length})
+        </h2>
+        {pendingUsers.length === 0 ? (
+          <p className="text-zinc-500 text-sm">No users waiting for approval.</p>
+        ) : (
+          <div className="space-y-2">
+            {pendingUsers.map((u) => (
+              <ApprovePanel key={u.id} user={u} />
+            ))}
+          </div>
+        )}
+      </section>
 
       {/* Feedback */}
       <section className="space-y-3">
@@ -73,10 +96,10 @@ export default async function AdminPage() {
         )}
       </section>
 
-      {/* Recent sign-ups */}
+      {/* Active users */}
       <section className="space-y-3">
         <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wide">
-          Recent users ({recentUsers.length})
+          Active users ({recentUsers.length})
         </h2>
         <div className="space-y-2">
           {recentUsers.map((u) => (
@@ -84,6 +107,7 @@ export default async function AdminPage() {
               <div>
                 <span className="text-zinc-200">{u.name ?? "—"}</span>
                 <span className="text-zinc-500 ml-2">{u.email}</span>
+                <span className="text-zinc-600 ml-2 text-xs">{u.tier}</span>
               </div>
               <span className="text-zinc-600 text-xs">{new Date(u.createdAt).toLocaleDateString()}</span>
             </div>

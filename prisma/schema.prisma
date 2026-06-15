@@ -13,6 +13,7 @@ model User {
   emailVerified   DateTime?
   password        String?
   tier            String           @default("free") // "free" | "beta" | "premium"
+  status          String           @default("pending") // "pending" | "active"
   accounts        Account[]
   workouts        Session[]
   goals           Goal[]
@@ -24,6 +25,14 @@ model User {
 }
 
 model EmailVerification {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique @default(cuid())
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model PasswordResetToken {
   id        String   @id @default(cuid())
   userId    String
   token     String   @unique @default(cuid())

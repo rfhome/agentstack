@@ -27,7 +27,7 @@ The system gets sharper over time as session history accumulates. All agents rec
 | Framework | Next.js (App Router, TypeScript) |
 | Styling | Tailwind CSS |
 | Database | PostgreSQL (Railway) via Prisma 7 + PrismaPg adapter |
-| Auth | NextAuth v5 — email/password (email-verified) + Google OAuth |
+| Auth | NextAuth v5 — email/password + Google OAuth; admin approval gate; forgot-password via Resend |
 | AI | Anthropic Claude, OpenAI GPT-4o, Google Gemini |
 | Wearables | Oura Ring OAuth 2.0, Fitbit via Google Fit API, Apple Health via webhook |
 | Deployment | Railway |
@@ -67,6 +67,13 @@ FITBIT_CLIENT_SECRET="..."
 # Google Sign-In (can reuse FITBIT_CLIENT_ID/SECRET if same Google Cloud project)
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
+
+# Email (Resend — used for verification, password reset, and admin notifications)
+RESEND_API_KEY="re_..."
+AUTH_EMAIL_FROM="AgentStack <you@yourdomain.com>"   # optional
+
+# Admin gate
+ADMIN_EMAIL="you@example.com"   # new signups notify this address; admin approves at /admin
 ```
 
 Apply the database schema:
@@ -94,6 +101,10 @@ npm run dev
 | `/settings` | Connect/disconnect Oura Ring, Fitbit, Apple Health webhook; tier badge; promo code redemption |
 | `/profile` | Edit name and full training context (the markdown document all agents read); link to redo setup wizard |
 | `/onboarding` | First-run wizard — goal, experience, program structure, gym type, injuries; generates AI coaching profile |
+| `/admin` | Admin dashboard — approve pending users (with tier assignment), view feedback, agent parse failures, active users |
+| `/auth/forgot-password` | Request password reset link (credentials users only) |
+| `/auth/reset-password` | Set new password via emailed token |
+| `/auth/pending` | Holding page for approved-pending users after signup |
 
 ---
 
