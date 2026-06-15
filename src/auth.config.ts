@@ -18,7 +18,9 @@ export const authConfig: NextAuthConfig = {
       const isLoggedIn = !!auth?.user;
       const isAuthPage = nextUrl.pathname.startsWith("/auth/");
       const isApiAuth = nextUrl.pathname.startsWith("/api/auth/");
-      if (isAuthPage || isApiAuth) return true;
+      // Token-authenticated webhooks — no session required
+      const isPublicWebhook = nextUrl.pathname.startsWith("/api/wearables/apple-health/ingest");
+      if (isAuthPage || isApiAuth || isPublicWebhook) return true;
       return isLoggedIn;
     },
   },
