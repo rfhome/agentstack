@@ -27,7 +27,7 @@
  * }
  */
 
-type MetricEntry = { date?: string; value?: number; Avg?: number };
+type MetricEntry = { date?: string; value?: number; qty?: number; Avg?: number; Min?: number };
 
 type RawMetric = {
   name: string;
@@ -103,7 +103,7 @@ export function parseHealthExport(body: unknown): {
       const date = entry.date ?? "";
       const ymd = toYMD(date) ?? date.slice(0, 10);
       if (!ymd) continue;
-      const val = entry.value ?? entry.Avg;
+      const val = entry.value ?? entry.qty ?? entry.Avg;
       if (val == null) continue;
       const day = ensure(ymd);
 
