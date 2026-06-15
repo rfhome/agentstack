@@ -36,7 +36,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
+  // Temporary debug — log raw payload structure to Railway logs
+  console.log("[apple-health/ingest] raw payload keys:", JSON.stringify(Object.keys(body as object)));
+  console.log("[apple-health/ingest] payload sample:", JSON.stringify(body).slice(0, 800));
+
   const { days, workouts } = parseHealthExport(body);
+  console.log("[apple-health/ingest] parsed:", { daysCount: days.length, workoutsCount: workouts.length });
 
   // Upsert daily summaries
   for (const day of days) {
