@@ -27,8 +27,13 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - Agent files: `src/lib/agents/pulse.ts`, `forge.ts`, `lens.ts`, `orchestrator.ts`
 - All agents return JSON. Use `extractJSON<T>()` from `src/lib/agents/parse.ts` — do not inline the fence-extraction pattern
 - `weights` (String?) is the source of truth for per-set load — not `weightLbs` (legacy, often 0)
-- Add `fitbitContext` and `ouraContext` as optional fields when extending AgentInput
+- Add `fitbitContext`, `ouraContext`, `appleHealthContext`, `recentActivities` as optional fields when extending AgentInput
 - Nexus returns `suggestedRating` ("A"|"B"|"C") and `ratingReason` — validated with `isValidRating()`
+- **Image handling per agent:**
+  - Pulse: strip `images` from JSON, pass as Anthropic vision content blocks
+  - Forge: strip `images` from JSON entirely — GPT-4o prompt is text-only; base64 in the JSON string blows the 128k context window
+  - Lens: strip `images` from JSON, pass as Gemini `inlineData` parts — base64 embedded in JSON text exceeds Gemini's token limit and silently kills the agent
+  - Nexus: strip `images` from JSON, pass as Anthropic vision content blocks
 
 ### Tests
 - Framework: Vitest (`npm test` / `npm run test:watch`)
@@ -78,7 +83,8 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - Oura token exchange: body params with client_id/secret
 - Fitbit/Google token exchange: body params (NOT Basic auth) — Google standard
 - CSRF state: `Buffer.from(userId).toString("base64url")` — verified against active session in callback
-- **Oura API v2 uses `day` (not `date`)** on `daily_readiness`, `daily_sleep`, `daily_activity` responses. All map key lookups in `oura.ts` use `r.day ?? r.date` to handle both. The TypeScript interfaces expose both fields (`day: string`, `date?: string`). Never use `r.date` alone as a date key — it will always be `undefined` from the live API.
+- **Oura API v2 uses `day` (not `date`)** on `daily_readiness`, `daily_sleep`, `daily_activity` responses. All map key lookups in `oura.ts` use `r.day ?? r.date` to handle both. Never use `r.date` alone — it will always be `undefined` from the live API.
+- **Apple Health:** webhook-based via Health Auto Export app. No OAuth. `GET /api/wearables/apple-health` auto-creates a `WearableConnection` record with a token on first visit (pre-generates webhook URL). Returns `connected: true` only when ≥1 `AppleHealthDay` row exists — the record existing alone is not enough. `DELETE` purges both the connection and all `AppleHealthDay` rows. Ingest endpoint at `/api/wearables/apple-health/ingest?token=<token>` requires no session auth — authenticated via token only. Parser in `src/lib/apple-health.ts`.
 
 ### Styling
 - Dark zinc theme throughout: `bg-zinc-950` page, `bg-zinc-900` cards, `border-zinc-800` borders
@@ -95,6 +101,14 @@ Railway: also needs `AUTH_TRUST_HOST=true`
 ### dotenv in scripts
 Scripts that run outside Next.js must use `config({ path: ".env.local", override: true })` — shell environment may have empty API keys that would otherwise block dotenv.
 
+### Activity logging
+- Standalone activities (runs, pickleball, etc.) are separate from gym sessions — `Activity` model, not `Session`
+- `POST /api/activities` saves to DB. `POST /api/activities/analyze` is read-only (Gemini vision, returns metrics, no DB write) — used by `LogActivityModal` to pre-fill form fields before the user clicks Save. Always use the analyze-only endpoint for photo preview; never save on upload.
+- `LogActivityButton` is a thin client wrapper around `LogActivityModal` that calls `router.refresh()` on save to re-render the server-side dashboard
+
+### Timezone-safe dates
+- `new Date().toISOString().split("T")[0]` is UTC — users east of UTC will get yesterday's date. For local date use: `const d = new Date(); return \`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}\``
+
 ## Common mistakes to avoid
 - Don't import from `@/auth` in Edge middleware — use `@/auth.config` only
 - Don't use `response_format: { type: "json_object" }` on Claude — GPT-4o only
@@ -105,3 +119,5 @@ Scripts that run outside Next.js must use `config({ path: ".env.local", override
 - Don't add user text directly into agent system prompts — always use `wrapAgentInput()` for user message content
 - Don't use `r.date` for Oura API v2 data — use `r.day ?? r.date` (v2 uses `day`)
 - Don't put `onFocus`/`onBlur` on individual inputs inside a card when you need a "card is active" highlight — put them on the container div and use `e.currentTarget.contains(e.relatedTarget)` in `onBlur` to avoid flicker when tabbing between fields within the same card
+- Don't embed base64 image data in JSON text sent to any agent — Pulse/Lens/Nexus use vision content blocks; Forge strips images entirely
+- Don't run `prisma migrate dev` — schema is managed via `prisma db push`; the migration history is behind the actual Railway DB

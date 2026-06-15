@@ -27,9 +27,9 @@ The system gets sharper over time as session history accumulates. All agents rec
 | Framework | Next.js (App Router, TypeScript) |
 | Styling | Tailwind CSS |
 | Database | PostgreSQL (Railway) via Prisma 7 + PrismaPg adapter |
-| Auth | NextAuth v5 — email/password + Google OAuth |
+| Auth | NextAuth v5 — email/password (email-verified) + Google OAuth |
 | AI | Anthropic Claude, OpenAI GPT-4o, Google Gemini |
-| Wearables | Oura Ring OAuth 2.0, Fitbit via Google Fit API |
+| Wearables | Oura Ring OAuth 2.0, Fitbit via Google Fit API, Apple Health via webhook |
 | Deployment | Railway |
 
 ---
@@ -87,12 +87,12 @@ npm run dev
 
 | Route | Description |
 |-------|-------------|
-| `/fitness` | Dashboard — streaks, this-week stats, weekly Nexus summary, recent recommendations |
-| `/fitness/log` | Log a session — exercises, HR/AZM/duration, cardio activities, rating; active exercise card highlighted in orange |
-| `/fitness/sessions` | Full session history — expandable cards with exercises, cardio, Nexus synthesis, per-agent breakdown |
+| `/fitness` | Dashboard — streaks, this-week stats, weekly Nexus summary, recommendations, last 4 sessions, last 4 activities; all sections collapsible |
+| `/fitness/log` | Log a session — exercises with per-set weights, HR/AZM/duration/cardio load, cardio entries with machine photo analysis, rating, screenshots; Save Only or Save & Analyze |
+| `/fitness/sessions` | History — Sessions \| Activities tabs; full expandable cards with per-agent breakdown and Nexus synthesis |
 | `/fitness/progress` | Progress — 52-week training heatmap, personal records, Oura 28-day recovery trend, weight-over-time charts |
-| `/settings` | Connect/disconnect Oura Ring and Fitbit; tier badge; promo code redemption |
-| `/profile` | Edit name and full training context (the markdown document all agents read) |
+| `/settings` | Connect/disconnect Oura Ring, Fitbit, Apple Health webhook; tier badge; promo code redemption |
+| `/profile` | Edit name and full training context (the markdown document all agents read); link to redo setup wizard |
 | `/onboarding` | First-run wizard — goal, experience, program structure, gym type, injuries; generates AI coaching profile |
 
 ---
@@ -109,7 +109,7 @@ POST /api/analyze
        └─ Claude Sonnet — synthesized recommendation + nextActions
 ```
 
-Agent inputs include: session data, last 4 sessions, active goals, user profile context, Oura data (if connected), Fitbit/Google Fit data (if connected).
+Agent inputs include: session data, last 4 sessions, active goals, user profile context, Oura data (if connected), Fitbit/Google Fit data (if connected), Apple Health daily metrics (if webhook is receiving data), recent standalone activities (last 10, within 7 days), and up to 4 workout screenshots (passed as vision blocks to image-capable models).
 
 All agent responses and Nexus synthesis are stored in `AgentLog` and `Recommendation` tables, linked to the session.
 
@@ -120,3 +120,5 @@ All agent responses and Nexus synthesis are stored in `AgentLog` and `Recommenda
 **Oura Ring** — connects via OAuth 2.0 at dev.ouraring.com. Provides readiness score, HRV balance, sleep score, temperature deviation, deep/REM sleep duration. Injected into Lens and Pulse context on every analysis.
 
 **Fitbit / Google Fit** — Fitbit's legacy developer portal closed new app registrations in 2026; integration now uses Google OAuth + Google Fit REST API. Provides avg/max heart rate, active minutes, heart points (AZM equivalent), steps. Requires Google Cloud project with Fitness API enabled.
+
+**Apple Health** — no native iOS app required. Uses the free [Health Auto Export](https://www.healthautoexport.com/) app to POST daily metrics (HRV, resting HR, sleep hours, active calories, steps) and workouts to a personal webhook URL. Setup: Settings → Apple Health → copy webhook URL → paste into Health Auto Export automation. Connected status activates once the first payload is received.

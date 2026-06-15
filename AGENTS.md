@@ -32,6 +32,9 @@ interface AgentInput {
   userContext: string;               // full training profile markdown
   ouraContext?: string;              // formatted Oura readiness/sleep/HRV
   fitbitContext?: string;            // formatted Google Fit HR/AZM/steps
+  appleHealthContext?: string;       // formatted Apple Health daily metrics (HRV, resting HR, sleep, steps)
+  recentActivities?: RecentActivity[]; // standalone activities (runs, pickleball, etc.) — last 10, within 7 days
+  images?: SessionImage[];           // workout screenshots (base64 + mediaType + name) — up to 4
 }
 
 interface SessionSummary {
@@ -50,6 +53,14 @@ interface SessionSummary {
     weightLbs: number;  // legacy field (may be 0)
     weights?: string;   // per-set weights string — source of truth, e.g. "95,95,100"
   }[];
+  cardioActivities: {
+    tag: string;        // "warmup" | "finisher" | "standalone"
+    machine: string;    // "treadmill" | "bike" | "rower" | "elliptical"
+    durationMin?: number | null;
+    distanceMi?: number | null;
+    calories?: number | null;
+    avgHR?: number | null;
+  }[];
 }
 ```
 
@@ -64,7 +75,10 @@ Analyzes session performance with emphasis on:
 - Progressive overload vs. recent history — what moved, what stalled, any PRs
 - HR zone classification using Fitbit data when available (Fat Burn / Cardio / Peak minutes)
 - Energy/effort inference from rating, notes, and HR
+- Cardio activities breakdown (warmup/finisher/standalone, machine, HR, duration)
 - Best and worst exercise of the session
+
+**Image handling:** strips `images` from JSON text, passes them as separate Anthropic vision content blocks so screenshots are readable without inflating the text prompt.
 
 Returns JSON: `{ analysis, recommendations, flags, nextSession, ... }`
 
@@ -80,6 +94,8 @@ Prescribes the next session with:
 - Reads `weights` string to determine actual load (e.g. "95,95,100" → working weight 95–100 lbs)
 - Respects the user's defined program structure from `userContext`
 
+**Image handling:** strips `images` before `JSON.stringify` — Forge is text-only (GPT-4o receives a JSON string, not a vision request), and embedding base64 blobs in the text prompt would blow the 128k context window.
+
 Returns JSON: `{ analysis, recommendations, flags, nextSession, ... }`
 
 ---
@@ -91,9 +107,12 @@ Returns JSON: `{ analysis, recommendations, flags, nextSession, ... }`
 Assesses through the lens of long-term health:
 - Oura = how ready the athlete was going in (readiness, HRV, sleep score, temperature deviation)
 - Fitbit = how hard they actually worked (HR, heart points, active minutes)
+- Apple Health = additional recovery signal (HRV trend, resting HR, sleep hours, steps)
 - Flags insufficient recovery, overreaching, consecutive high-load days
 - Incorporates brain health / neurological longevity context from user profile
-- Considers lifestyle activities (pickleball, golf, dog walks) as cumulative fatigue
+- Considers standalone activities (pickleball, golf, dog walks) as cumulative fatigue via `recentActivities`
+
+**Image handling:** strips `images` from JSON text, passes them as Gemini `inlineData` parts — base64 embedded in JSON text would exceed Gemini's token limit and silently kill the agent.
 
 Returns JSON: `{ analysis, recommendations, flags, nextSession, ... }`
 

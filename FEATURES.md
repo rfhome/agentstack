@@ -4,6 +4,7 @@
 
 ### Core fitness loop
 - [x] Session logging — date, cycle day/number, duration, avg HR, cardio load, AZM, rating (A/B/C), notes
+- [x] Cycle number auto-calculated server-side (last session with same cycleDay + 1; defaults to 1)
 - [x] Exercise logging — name, sets, reps per-set string, per-set weights string, notes
 - [x] Save-only (no analysis) vs Save & Analyze
 - [x] Workout prescription — "Get Workout" fetches AI-generated session plan based on cycle day and profile
@@ -13,6 +14,7 @@
 - [x] Session notes visible in History card (expanded view)
 - [x] Session template — "Last Push/Pull/Legs/Arms" button pre-fills exercises + weights from most recent matching session
 - [x] Weight quick-add buttons — +2.5 / +5 / +10 append a new set weight by incrementing the last value in the per-set string
+- [x] Draft auto-save (localStorage, 500ms debounce) — restored on next visit with date + time shown
 - [x] PWA manifest + icons — add-to-home-screen on iOS/Android, opens standalone (no browser chrome)
 
 ### Multi-agent analysis
@@ -31,28 +33,41 @@
 ### Wearables
 - [x] Oura Ring OAuth 2.0 — readiness, HRV, sleep score, deep/REM sleep, temperature deviation
 - [x] Fitbit via Google Fit API — avg/max HR, active minutes, heart points (AZM), steps
-- [x] Both injected into agent context on every analysis
-- [x] Wearable status and data visible on Settings page
+- [x] Apple Health via webhook — Health Auto Export app POSTs daily metrics (HRV, resting HR, sleep hours, active kcal, steps) and workouts; workouts create Activity records; daily metrics stored as `AppleHealthDay` rows fed to Lens as `appleHealthContext`
+- [x] Apple Health status shows "Connected" only after first real data payload received (not on record auto-creation)
+- [x] All wearable data injected into agent context on every analysis
+- [x] Wearable status and disconnect controls visible on Settings page
 
 ### History & progress
-- [x] Session history page (/fitness/sessions) — expandable cards with exercises, Nexus synthesis, per-agent accordion
+- [x] History page (/fitness/sessions) — Sessions | Activities tabs; expandable session cards with exercises, cardio, Nexus synthesis, per-agent accordion
 - [x] "Run Analysis" button on unanalyzed sessions (inline, no page reload)
 - [x] Progress charts (/fitness/progress) — max weight per exercise over time (recharts)
 - [x] Analyzed / Not analyzed badge on session cards
-- [x] Session cards show AZM alongside duration and avg HR in the summary row
-- [x] Cardio activities (machine, HR, duration, distance, calories) shown in expanded session view
+- [x] Session cards show cardio load and AZM alongside duration and avg HR in the summary row
+- [x] Cardio activities (machine, tag, HR, duration, distance, calories) shown in expanded session view
 
 ### Profile & goals
 - [x] Profile editor (/profile) — edit name and full training context markdown
 - [x] Goals tracker — target weight/reps per exercise, mark achieved
 - [x] Recommendations feed on fitness dashboard
 
+### Activity logging (standalone, non-gym)
+- [x] Log Activity modal — type picker (Running, Walking, Hiking, Cycling, Pickleball, Tennis, etc.), date, duration, distance, avg HR, calories, notes
+- [x] Wearable screenshot → Gemini vision auto-fills metrics (read-only analyze endpoint — does NOT save until user clicks Save)
+- [x] Activities appear on dashboard (last 4) and History Activities tab (all)
+- [x] Activity data fed to agents as `recentActivities` — Lens uses it as cumulative fatigue signal
+- [x] Deep-link from dashboard "View all activities →" to History#activities tab
+
 ### UX / mobile
 - [x] Bottom nav bar (mobile-only) — Fitness, History, Progress, Settings tabs with active-state highlighting
 - [x] In-app PWA install button — listens for `beforeinstallprompt`, auto-hides when already installed or running standalone
 - [x] Active exercise card gets an orange border while any field inside it has focus — gym-visibility highlight
 - [x] Fitbit fill button fills HR, AZM, and duration from today's Google Fit data in one tap
-- [x] Cardio machine photo analysis — upload treadmill/bike/rower screenshot; Lens extracts duration, distance, HR, calories and auto-populates the form
+- [x] Cardio machine photo analysis — upload treadmill/bike/rower screenshot; Gemini extracts duration, distance, HR, calories and auto-populates the cardio entry form; shows red error state + "Analysis failed — try again" on failure
+- [x] Dashboard sections collapsible (This Week, Recommendations, Goals, Recent Activities, Recent Sessions) — chevron toggle, defaults open
+- [x] Log Activity button in dashboard header next to Log Session; refreshes server components on save
+- [x] "Redo setup wizard" link on Profile page
+- [x] Save & Analyze has 120s client timeout with readable fallback message ("session was saved — retry from History") instead of opaque browser "Failed to fetch"
 
 ### Deployment
 - [x] Railway deployment with PostgreSQL
@@ -66,11 +81,11 @@
 ## Backlog
 
 ### Near-term
+- [ ] **Async analysis + push notifications** — save session → background job → Web Push notification when agents finish → user taps to see results and accept rating. Eliminates the 30–60s blocking spinner. Requires service worker, Web Push subscription per device, and a job queue or polling endpoint.
 
 ### Medium-term
 - [ ] **ChatGPT conversation import** — parse ChatGPT data export to seed historical session records
-- [ ] **Apple Health integration** — for richer iOS data (HRV, VO2 max, sleep stages) beyond what Google Fit surfaces
-- [ ] **PostgreSQL Row-Level Security** — DB-level user isolation as a second enforcement layer
+- [ ] **PostgreSQL Row-Level Security** — DB-level user isolation as a second enforcement layer on top of application-level `userId` filtering
 - [ ] **Invite / multi-user** — allow a second user (e.g. trainer) to view read-only
 
 ### Productization (Phase 1 — Onboarding)
