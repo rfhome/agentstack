@@ -42,6 +42,13 @@ interface TrendPoint {
   restingHR: number | null;
 }
 
+interface AppleHealthPoint {
+  date: string;
+  hrv: number | null;
+  restingHR: number | null;
+  sleepHours: number | null;
+}
+
 // ─── Frequency heatmap ───────────────────────────────────────────────────────
 
 const INTENSITY = ["bg-zinc-800", "bg-violet-900", "bg-violet-700", "bg-violet-500", "bg-violet-400"];
@@ -237,6 +244,79 @@ function RecoveryTrendChart({ trend }: { trend: TrendPoint[] }) {
   );
 }
 
+// ─── Apple Health trend chart ────────────────────────────────────────────────
+
+function AppleHealthTrendChart({ trend }: { trend: AppleHealthPoint[] }) {
+  if (trend.length === 0) return null;
+
+  const hasHRV = trend.some((p) => p.hrv !== null);
+  const hasHR = trend.some((p) => p.restingHR !== null);
+  const hasSleep = trend.some((p) => p.sleepHours !== null);
+
+  if (!hasHRV && !hasHR && !hasSleep) return null;
+
+  const tooltipStyle = {
+    backgroundColor: "#18181b",
+    border: "1px solid #3f3f46",
+    borderRadius: "8px",
+    color: "#f4f4f5",
+    fontSize: 12,
+  };
+
+  const chartData = trend.map((p) => ({
+    label: formatDate(p.date),
+    hrv: p.hrv,
+    restingHR: p.restingHR,
+    sleepHours: p.sleepHours,
+  }));
+
+  return (
+    <div className="space-y-4">
+      {(hasHRV || hasHR) && (
+        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4">
+          <p className="text-xs text-zinc-500 mb-3">Heart metrics</p>
+          <ResponsiveContainer width="100%" height={160}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
+              <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "#71717a", fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+              <Tooltip contentStyle={tooltipStyle} />
+              {hasHRV && (
+                <Line type="monotone" dataKey="hrv" name="HRV (ms)" stroke="#f472b6" strokeWidth={2}
+                  dot={{ fill: "#f472b6", r: 2, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} connectNulls />
+              )}
+              {hasHR && (
+                <Line type="monotone" dataKey="restingHR" name="Resting HR (bpm)" stroke="#fb923c" strokeWidth={2}
+                  dot={{ fill: "#fb923c", r: 2, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} connectNulls />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+          <div className="flex gap-4 mt-2">
+            {hasHRV && <span className="flex items-center gap-1.5 text-xs text-zinc-400"><span className="w-2.5 h-2.5 rounded-full bg-pink-400 shrink-0" />HRV</span>}
+            {hasHR && <span className="flex items-center gap-1.5 text-xs text-zinc-400"><span className="w-2.5 h-2.5 rounded-full bg-orange-400 shrink-0" />Resting HR</span>}
+          </div>
+        </div>
+      )}
+
+      {hasSleep && (
+        <div className="rounded-xl bg-zinc-900 border border-zinc-800 p-4">
+          <p className="text-xs text-zinc-500 mb-3">Sleep (hours)</p>
+          <ResponsiveContainer width="100%" height={120}>
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" />
+              <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fill: "#71717a", fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+              <Tooltip contentStyle={tooltipStyle} formatter={(v) => [`${v} hrs`, "Sleep"]} />
+              <Line type="monotone" dataKey="sleepHours" name="Sleep" stroke="#818cf8" strokeWidth={2}
+                dot={{ fill: "#818cf8", r: 2, strokeWidth: 0 }} activeDot={{ r: 4, strokeWidth: 0 }} connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Weight chart ────────────────────────────────────────────────────────────
 
 function formatDate(dateStr: string): string {
@@ -249,15 +329,18 @@ function formatDate(dateStr: string): string {
 export default function ProgressPage() {
   const [data, setData] = useState<ProgressData | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);
+  const [appleHealth, setAppleHealth] = useState<AppleHealthPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/progress").then((r) => r.json()),
       fetch("/api/wearables/oura/trend").then((r) => r.json()).catch(() => ({ trend: [] })),
-    ]).then(([progressData, trendData]: [ProgressData, { trend: TrendPoint[] }]) => {
+      fetch("/api/wearables/apple-health/trend").then((r) => r.json()).catch(() => ({ trend: [] })),
+    ]).then(([progressData, trendData, ahData]: [ProgressData, { trend: TrendPoint[] }, { trend: AppleHealthPoint[] }]) => {
       setData(progressData);
       setTrend(trendData.trend ?? []);
+      setAppleHealth(ahData.trend ?? []);
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -270,7 +353,7 @@ export default function ProgressPage() {
     );
   }
 
-  const hasData = (data?.exercises?.length ?? 0) > 0 || (data?.trainingDays?.length ?? 0) > 0 || trend.length > 0;
+  const hasData = (data?.exercises?.length ?? 0) > 0 || (data?.trainingDays?.length ?? 0) > 0 || trend.length > 0 || appleHealth.length > 0;
 
   if (!hasData) {
     return (
@@ -300,6 +383,14 @@ export default function ProgressPage() {
         <section className="space-y-3">
           <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Recovery Trend — Last 28 Days</h2>
           <RecoveryTrendChart trend={trend} />
+        </section>
+      )}
+
+      {/* Apple Health trend */}
+      {appleHealth.length > 0 && (
+        <section className="space-y-3">
+          <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Apple Health — Last 28 Days</h2>
+          <AppleHealthTrendChart trend={appleHealth} />
         </section>
       )}
 
