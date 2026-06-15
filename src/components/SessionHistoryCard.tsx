@@ -105,7 +105,9 @@ export function SessionHistoryCard({ session }: { session: Session }) {
 
   const date = new Date(session.date).toLocaleDateString("en-US", { month: "short", day: "numeric" });
   const cycleLabel = session.cycleDay ? CYCLE_LABELS[session.cycleDay] ?? `Day ${session.cycleDay}` : "Session";
-  const analyzed = session.agentLogs.length > 0 || session.recommendation !== null || analysisResult !== null;
+  const hasAnyAgentLog = session.agentLogs.length > 0 || analysisResult !== null;
+  const hasRecommendation = session.recommendation !== null || analysisResult !== null;
+  const analyzed = hasAnyAgentLog || hasRecommendation;
   const displayRecommendation = analysisResult?.recommendation ?? session.recommendation;
   const displayAgentLogs = analysisResult?.agentLogs ?? session.agentLogs;
 
@@ -128,7 +130,7 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                 Analyzed
               </span>
             )}
-            {!analyzed && (
+            {!hasAnyAgentLog && (
               <Link
                 href={`/fitness/log?edit=${session.id}`}
                 className="text-xs px-2 py-0.5 rounded-full border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
@@ -201,7 +203,7 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             </div>
           )}
 
-          {!analyzed && !analyzing && (
+          {!hasRecommendation && !analyzing && (
             <div>
               {analyzeError && <p className="text-red-400 text-xs mb-2">{analyzeError}</p>}
               <button
