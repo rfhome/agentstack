@@ -391,9 +391,16 @@ function LogSessionPageInner() {
     setError("");
     setStep("saving");
     try {
-      const sessionId = await saveSession();
-      localStorage.removeItem(DRAFT_KEY);
-      setSavedSessionId(sessionId);
+      // If the session is already saved (e.g. user clicked "Analyze" from the saved screen),
+      // skip the re-save — it would resend all image data for no reason and could fail.
+      let sessionId: number;
+      if (savedSessionId) {
+        sessionId = savedSessionId;
+      } else {
+        sessionId = await saveSession();
+        localStorage.removeItem(DRAFT_KEY);
+        setSavedSessionId(sessionId);
+      }
       setStep("analyzing");
 
       const interval = setInterval(() => {
@@ -424,10 +431,21 @@ function LogSessionPageInner() {
 
       clearInterval(interval);
       clearTimeout(abortTimer);
-      const data = await analyzeRes.json();
+
+      // Guard against HTML error pages (e.g. Railway 502 during a restart)
+      // returning instead of JSON — the raw SyntaxError is not user-friendly.
+      const contentType = analyzeRes.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `Server returned an unexpected response (status ${analyzeRes.status}). ` +
+          "Your session was saved — please try again in a moment."
+        );
+      }
+
+      const data = await analyzeRes.json() as { error?: string };
       if (!analyzeRes.ok) throw new Error(data.error ?? "Analysis failed");
 
-      setResult(data);
+      setResult(data as AnalysisResult);
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
