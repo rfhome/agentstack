@@ -86,9 +86,10 @@ function parseAgentResponseServer(text: string): { analysis?: string; recommenda
   return { analysis: text };
 }
 
-export default async function SessionsPage() {
+export default async function SessionsPage({ searchParams }: { searchParams: Promise<{ analyzed?: string }> }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/signin");
+  const { analyzed } = await searchParams;
   const userId = session.user.id;
 
   const [sessions, activities] = await withRLS(userId, (db) => Promise.all([
@@ -174,6 +175,11 @@ export default async function SessionsPage() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-white">History</h1>
+      {analyzed === "check" && (
+        <div className="rounded-xl border border-amber-800 bg-amber-900/20 px-4 py-3 text-sm text-amber-300">
+          The connection dropped mid-analysis — your session was saved. Check below to see if the analysis completed.
+        </div>
+      )}
       <HistoryTabs sessions={serialized} activities={serializedActivities} />
     </div>
   );

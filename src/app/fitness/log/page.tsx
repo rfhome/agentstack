@@ -227,9 +227,12 @@ function LogSessionPageInner() {
     } catch { /* ignore */ }
   }, []);
 
-  // Auto-save draft (debounced 500ms), only while form is active
+  // Auto-save draft (debounced 500ms), only while editing an unsaved session.
+  // Skip when savedSessionId is set — the session is already in the DB, so
+  // there's nothing "unsaved" to draft, and re-writing it would cause a false
+  // "Unsaved draft found" banner on the next visit.
   useEffect(() => {
-    if (step !== "idle") return;
+    if (step !== "idle" || savedSessionId) return;
     const timer = setTimeout(() => {
       try {
         const draftData: Draft = {
@@ -241,7 +244,7 @@ function LogSessionPageInner() {
       } catch { /* localStorage full or unavailable */ }
     }, 500);
     return () => clearTimeout(timer);
-  }, [step, date, cycleDay, cycleNumber, duration, avgHR, cardioLoad, azm, rating, notes, exercises, warmupItems, finisherItems, cardioEntries]);
+  }, [step, savedSessionId, date, cycleDay, cycleNumber, duration, avgHR, cardioLoad, azm, rating, notes, exercises, warmupItems, finisherItems, cardioEntries]);
 
   function restoreDraft() {
     if (!draft) return;
@@ -418,15 +421,16 @@ function LogSessionPageInner() {
           body: JSON.stringify({ sessionId }),
           signal: abortCtrl.signal,
         });
-      } catch (fetchErr) {
+      } catch {
+        // Network drop or timeout — the session is saved and the analysis may have
+        // completed on the server despite the client disconnecting (HTTP 499 pattern
+        // on mobile when the browser kills long-running requests). Clear the draft
+        // and send to History so the user can see the real state.
         clearInterval(interval);
         clearTimeout(abortTimer);
-        const isTimeout = fetchErr instanceof DOMException && fetchErr.name === "AbortError";
-        throw new Error(
-          isTimeout
-            ? "Analysis timed out. Your session was saved — try again from History."
-            : "Could not reach the server. Your session was saved — check your connection and try again."
-        );
+        localStorage.removeItem(DRAFT_KEY);
+        router.push("/fitness/sessions?analyzed=check");
+        return;
       }
 
       clearInterval(interval);
@@ -436,15 +440,15 @@ function LogSessionPageInner() {
       // returning instead of JSON — the raw SyntaxError is not user-friendly.
       const contentType = analyzeRes.headers.get("content-type") ?? "";
       if (!contentType.includes("application/json")) {
-        throw new Error(
-          `Server returned an unexpected response (status ${analyzeRes.status}). ` +
-          "Your session was saved — please try again in a moment."
-        );
+        localStorage.removeItem(DRAFT_KEY);
+        router.push("/fitness/sessions?analyzed=check");
+        return;
       }
 
       const data = await analyzeRes.json() as { error?: string };
       if (!analyzeRes.ok) throw new Error(data.error ?? "Analysis failed");
 
+      localStorage.removeItem(DRAFT_KEY);
       setResult(data as AnalysisResult);
       setStep("done");
     } catch (err) {
