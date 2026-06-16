@@ -797,13 +797,6 @@ function LogSessionPageInner() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1">Notes</label>
-            <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
-              placeholder="How did it feel? Anything to flag?"
-              rows={2}
-              className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 resize-none" />
-          </div>
         </div>
 
         {/* Prescription panel */}
@@ -1315,6 +1308,14 @@ function LogSessionPageInner() {
               ))}
             </div>
           )}
+        </div>
+
+        <div>
+          <label className="block text-xs text-zinc-500 mb-1">Post-Workout Notes</label>
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
+            placeholder="How did it feel? Anything to flag?"
+            rows={2}
+            className="w-full rounded-lg bg-zinc-900 border border-zinc-800 px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600 resize-none" />
         </div>
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
