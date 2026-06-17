@@ -411,7 +411,7 @@ function LogSessionPageInner() {
       }, 3000);
 
       const abortCtrl = new AbortController();
-      const abortTimer = setTimeout(() => abortCtrl.abort(), 120_000);
+      const abortTimer = setTimeout(() => abortCtrl.abort(), 180_000);
 
       let analyzeRes: Response;
       try {

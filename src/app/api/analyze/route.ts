@@ -186,7 +186,9 @@ export async function POST(req: NextRequest) {
       images: sessionImages.length > 0 ? sessionImages : undefined,
     };
 
+    const t0 = Date.now();
     const result = await runOrchestrator(input);
+    console.log(`[analyze] completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
     return NextResponse.json(result);
   } catch (err) {
