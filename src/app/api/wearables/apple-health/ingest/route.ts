@@ -36,13 +36,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Temporary debug — log metric names and first entry of each
-  const metrics = (body as { data?: { metrics?: { name: string; data: unknown[] }[] } })?.data?.metrics ?? [];
-  console.log("[apple-health/ingest] metric names:", metrics.map((m) => m.name));
-  console.log("[apple-health/ingest] first entries:", JSON.stringify(metrics.map((m) => ({ name: m.name, first: m.data?.[0] }))));
-
   const { days, workouts } = parseHealthExport(body);
-  console.log("[apple-health/ingest] parsed:", { daysCount: days.length, workoutsCount: workouts.length });
 
   // Upsert daily summaries
   for (const day of days) {
