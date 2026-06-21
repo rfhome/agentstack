@@ -445,7 +445,22 @@ function LogSessionPageInner() {
         return;
       }
 
-      const data = await analyzeRes.json() as { error?: string };
+      // Response is streamed with newline heartbeats; the actual JSON is the last
+      // non-empty line. Read the full stream before parsing.
+      let rawText = "";
+      if (analyzeRes.body) {
+        const reader = analyzeRes.body.getReader();
+        const decoder = new TextDecoder();
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          rawText += decoder.decode(value, { stream: true });
+        }
+      } else {
+        rawText = await analyzeRes.text();
+      }
+      const jsonLine = rawText.trim().split("\n").filter(Boolean).pop() ?? "{}";
+      const data = JSON.parse(jsonLine) as { error?: string };
       if (!analyzeRes.ok) throw new Error(data.error ?? "Analysis failed");
 
       localStorage.removeItem(DRAFT_KEY);

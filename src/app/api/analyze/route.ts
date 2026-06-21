@@ -186,11 +186,34 @@ export async function POST(req: NextRequest) {
       images: sessionImages.length > 0 ? sessionImages : undefined,
     };
 
-    const t0 = Date.now();
-    const result = await runOrchestrator(input);
-    console.log(`[analyze] completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        // Send newline heartbeats every 10s so Railway's proxy doesn't close
+        // an idle connection before the orchestrator finishes (takes 70–100s).
+        const heartbeat = setInterval(() => {
+          try { controller.enqueue(encoder.encode("\n")); } catch { /* closed */ }
+        }, 10_000);
 
-    return NextResponse.json(result);
+        try {
+          const t0 = Date.now();
+          const result = await runOrchestrator(input);
+          console.log(`[analyze] completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+          clearInterval(heartbeat);
+          controller.enqueue(encoder.encode(JSON.stringify(result)));
+          controller.close();
+        } catch (err) {
+          clearInterval(heartbeat);
+          console.error("[POST /api/analyze]", err);
+          controller.enqueue(encoder.encode(JSON.stringify({ error: "Analysis failed" })));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err) {
     console.error("[POST /api/analyze]", err);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
