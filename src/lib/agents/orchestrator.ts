@@ -106,19 +106,21 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
     });
   }
 
+  const suggestedRating = isValidRating(synthesis.suggestedRating)
+    ? synthesis.suggestedRating
+    : undefined;
+
   await prisma.recommendation.create({
     data: {
       domain: "fitness",
       content: safeContent,
       nextActions: synthesis.nextActions,
+      suggestedRating: suggestedRating ?? null,
+      ratingReason: synthesis.ratingReason ?? null,
       ...(input.sessionId ? { sessionId: input.sessionId } : {}),
       ...(input.userId ? { userId: input.userId } : {}),
     },
   });
-
-  const suggestedRating = isValidRating(synthesis.suggestedRating)
-    ? synthesis.suggestedRating
-    : undefined;
 
   return {
     recommendation: { content: safeContent, nextActions: synthesis.nextActions },

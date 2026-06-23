@@ -139,10 +139,12 @@ model Recommendation {
   user        User?    @relation(fields: [userId], references: [id])
   session     Session? @relation(fields: [sessionId], references: [id])
   sessionId   Int?
-  domain      String
-  content     String
-  nextActions Json
-  createdAt   DateTime @default(now())
+  domain          String
+  content         String
+  nextActions     Json
+  suggestedRating String?
+  ratingReason    String?
+  createdAt       DateTime @default(now())
 }
 
 model Goal {

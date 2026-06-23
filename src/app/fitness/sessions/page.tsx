@@ -155,6 +155,8 @@ export default async function SessionsPage({ searchParams }: { searchParams: Pro
         ? {
             content: s.recommendations[0].content,
             nextActions: s.recommendations[0].nextActions as string[],
+            suggestedRating: s.recommendations[0].suggestedRating ?? undefined,
+            ratingReason: s.recommendations[0].ratingReason ?? undefined,
           }
         : null,
       agentLogs: latestAgentLogs.map((log) => {

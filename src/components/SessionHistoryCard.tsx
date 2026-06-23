@@ -24,6 +24,8 @@ type AgentLog = {
 type Recommendation = {
   content: string;
   nextActions: string[];
+  suggestedRating?: string;
+  ratingReason?: string;
 };
 
 type CardioActivity = {
@@ -62,6 +64,12 @@ const RATING_BADGE: Record<string, string> = {
   C: "bg-red-900/50 text-red-400",
 };
 
+const RATING_COLORS: Record<string, string> = {
+  A: "border-emerald-500 text-emerald-400 bg-emerald-900/20",
+  B: "border-amber-500 text-amber-400 bg-amber-900/20",
+  C: "border-red-500 text-red-400 bg-red-900/20",
+};
+
 const AGENT_STYLES: Record<string, { border: string; badge: string; dot: string }> = {
   Pulse: { border: "border-blue-800", badge: "bg-blue-950 text-blue-300", dot: "bg-blue-400" },
   Forge: { border: "border-amber-800", badge: "bg-amber-950 text-amber-300", dot: "bg-amber-400" },
@@ -72,30 +80,77 @@ export function SessionHistoryCard({ session }: { session: Session }) {
   const [expanded, setExpanded] = useState(false);
   const [openAgent, setOpenAgent] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState<{ recommendation: Recommendation; agentLogs: AgentLog[] } | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<{
+    recommendation: Recommendation;
+    agentLogs: AgentLog[];
+    suggestedRating?: "A" | "B" | "C";
+    ratingReason?: string;
+  } | null>(null);
   const [analyzeError, setAnalyzeError] = useState("");
+  const [localRating, setLocalRating] = useState(session.rating);
+
+  async function applyRating(r: "A" | "B" | "C") {
+    const res = await fetch(`/api/sessions/${session.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ rating: r }),
+    });
+    if (res.ok) setLocalRating(r);
+  }
 
   async function handleAnalyze() {
     setAnalyzing(true);
     setAnalyzeError("");
     try {
-      const res = await fetch("/api/analyze", {
+      const fireRes = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId: session.id }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? "Analysis failed");
-      setAnalysisResult({
-        recommendation: data.recommendation,
-        agentLogs: data.agentResponses.map((r: { agentName: string; analysis: string; recommendations: string[]; flags?: string[] }, i: number) => ({
-          id: i,
-          agentName: r.agentName,
-          analysis: r.analysis,
-          recommendations: Array.isArray(r.recommendations) ? r.recommendations : [],
-          flags: Array.isArray(r.flags) ? r.flags : [],
-        })),
-      });
+      if (!fireRes.ok) {
+        const errData = await fireRes.json().catch(() => ({})) as { error?: string };
+        throw new Error(errData.error ?? "Failed to start analysis");
+      }
+
+      const POLL_MS = 3_000;
+      const deadline = Date.now() + 3 * 60 * 1_000;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, POLL_MS));
+        try {
+          const statusRes = await fetch(`/api/analyze/status?sessionId=${session.id}`);
+          const data = await statusRes.json() as {
+            status: string;
+            result?: {
+              recommendation: Recommendation;
+              agentResponses: { agentName: string; analysis: string; recommendations: string[]; flags?: string[] }[];
+              suggestedRating?: "A" | "B" | "C";
+              ratingReason?: string;
+            };
+            error?: string;
+          };
+          if (data.status === "completed" && data.result) {
+            setAnalysisResult({
+              recommendation: data.result.recommendation,
+              agentLogs: data.result.agentResponses.map((r, i) => ({
+                id: i,
+                agentName: r.agentName,
+                analysis: r.analysis,
+                recommendations: Array.isArray(r.recommendations) ? r.recommendations : [],
+                flags: Array.isArray(r.flags) ? r.flags : [],
+              })),
+              suggestedRating: data.result.suggestedRating,
+              ratingReason: data.result.ratingReason,
+            });
+            return;
+          } else if (data.status === "failed") {
+            throw new Error(data.error ?? "Analysis failed");
+          }
+        } catch (pollErr) {
+          if (pollErr instanceof Error && pollErr.message !== "Analysis failed") continue;
+          throw pollErr;
+        }
+      }
+      throw new Error("Analysis is taking longer than expected. Check back soon.");
     } catch (err) {
       setAnalyzeError(err instanceof Error ? err.message : "Analysis failed");
     } finally {
@@ -110,6 +165,9 @@ export function SessionHistoryCard({ session }: { session: Session }) {
   const analyzed = hasAnyAgentLog || hasRecommendation;
   const displayRecommendation = analysisResult?.recommendation ?? session.recommendation;
   const displayAgentLogs = analysisResult?.agentLogs ?? session.agentLogs;
+  const suggestedRating = (analysisResult?.suggestedRating ?? session.recommendation?.suggestedRating) as "A" | "B" | "C" | undefined;
+  const ratingReason = analysisResult?.ratingReason ?? session.recommendation?.ratingReason;
+  const ratingPending = hasRecommendation && !localRating && !!suggestedRating;
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900">
@@ -138,9 +196,17 @@ export function SessionHistoryCard({ session }: { session: Session }) {
                 Edit
               </Link>
             )}
-            {session.rating && (
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${RATING_BADGE[session.rating] ?? "bg-zinc-800 text-zinc-400"}`}>
-                {session.rating}
+            {ratingPending && (
+              <button
+                onClick={() => setExpanded(true)}
+                className="text-xs px-2 py-0.5 rounded-full bg-amber-900/40 text-amber-400 hover:bg-amber-900/60 transition-colors"
+              >
+                Rate ↓
+              </button>
+            )}
+            {localRating && (
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${RATING_BADGE[localRating] ?? "bg-zinc-800 text-zinc-400"}`}>
+                {localRating}
               </span>
             )}
             <button onClick={() => setExpanded((v) => !v)} className="text-zinc-500 text-xs ml-1">
@@ -219,6 +285,35 @@ export function SessionHistoryCard({ session }: { session: Session }) {
             <div className="flex items-center gap-3 py-2">
               <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
               <span className="text-zinc-400 text-sm">Agents analyzing...</span>
+            </div>
+          )}
+
+          {ratingPending && suggestedRating && (
+            <div className="rounded-xl border border-amber-800 bg-amber-900/10 p-4 space-y-3">
+              <p className="text-xs text-amber-400 uppercase tracking-wide font-medium">Suggested Rating</p>
+              <div className="flex items-start gap-3">
+                <span className={`text-xl font-bold px-3 py-1 rounded-lg border shrink-0 ${RATING_COLORS[suggestedRating]}`}>
+                  {suggestedRating}
+                </span>
+                {ratingReason && <p className="text-sm text-zinc-300 leading-snug">{ratingReason}</p>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => applyRating(suggestedRating)}
+                  className="px-4 py-1.5 rounded-lg bg-white text-zinc-900 text-sm font-medium hover:bg-zinc-200 transition-colors"
+                >
+                  Accept {suggestedRating}
+                </button>
+                {(["A", "B", "C"] as const).filter((r) => r !== suggestedRating).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => applyRating(r)}
+                    className={`px-3 py-1.5 rounded-lg border text-sm font-medium transition-colors ${RATING_COLORS[r]}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

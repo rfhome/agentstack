@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     prisma.recommendation.findFirst({
       where: { sessionId, userId },
       orderBy: { createdAt: "desc" },
-      select: { content: true, nextActions: true },
+      select: { content: true, nextActions: true, suggestedRating: true, ratingReason: true },
     }),
     prisma.agentLog.findMany({
       where: { sessionId, userId, agentName: { not: "Nexus" } },
@@ -70,7 +70,8 @@ export async function GET(req: NextRequest) {
         nextActions: recommendation.nextActions as string[],
       },
       agentResponses,
-      // suggestedRating/ratingReason not persisted to DB — only available from in-memory job
+      suggestedRating: recommendation.suggestedRating ?? undefined,
+      ratingReason: recommendation.ratingReason ?? undefined,
     },
   });
 }
