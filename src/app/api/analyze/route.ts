@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
 import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
+import { setJob } from "@/lib/analyze-jobs";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
@@ -186,50 +187,26 @@ export async function POST(req: NextRequest) {
       images: sessionImages.length > 0 ? sessionImages : undefined,
     };
 
-    const encoder = new TextEncoder();
-    let cancelled = false;
+    // Mark job as processing and fire the orchestrator in the background.
+    // Railway runs a persistent Node.js server so the promise survives after
+    // we return the 202 response.
+    setJob(sessionId, { status: "processing" });
+    const t0 = Date.now();
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        // Send newline heartbeats every 10s so Railway's proxy doesn't close
-        // an idle connection before the orchestrator finishes (takes 70–100s).
-        const heartbeat = setInterval(() => {
-          if (cancelled) return;
-          try { controller.enqueue(encoder.encode("\n")); } catch { cancelled = true; }
-        }, 10_000);
+    runOrchestrator(input)
+      .then((result) => {
+        console.log(`[analyze] session ${sessionId} completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+        setJob(sessionId, { status: "completed", result });
+      })
+      .catch((err: unknown) => {
+        console.error(`[analyze] session ${sessionId} failed after ${((Date.now() - t0) / 1000).toFixed(1)}s:`, err);
+        setJob(sessionId, {
+          status: "failed",
+          error: err instanceof Error ? err.message : "Analysis failed",
+        });
+      });
 
-        try {
-          const t0 = Date.now();
-          const result = await runOrchestrator(input);
-          console.log(`[analyze] completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-          clearInterval(heartbeat);
-          if (!cancelled) {
-            try {
-              controller.enqueue(encoder.encode(JSON.stringify(result)));
-              controller.close();
-            } catch {
-              // Client disconnected just as result was ready — it was saved to DB
-            }
-          }
-        } catch (err) {
-          clearInterval(heartbeat);
-          console.error("[POST /api/analyze]", err);
-          if (!cancelled) {
-            try {
-              controller.enqueue(encoder.encode(JSON.stringify({ error: "Analysis failed" })));
-              controller.close();
-            } catch { /* client gone */ }
-          }
-        }
-      },
-      cancel() {
-        cancelled = true;
-      },
-    });
-
-    return new Response(stream, {
-      headers: { "Content-Type": "application/json" },
-    });
+    return NextResponse.json({ status: "processing" }, { status: 202 });
   } catch (err) {
     console.error("[POST /api/analyze]", err);
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });

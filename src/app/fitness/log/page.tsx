@@ -410,69 +410,72 @@ function LogSessionPageInner() {
         setAnalyzeStep((s) => (s + 1) % ANALYZING_STEPS.length);
       }, 3000);
 
-      const abortCtrl = new AbortController();
-      const abortTimer = setTimeout(() => abortCtrl.abort(), 180_000);
-
-      let analyzeRes: Response;
+      // Fire the job — server returns 202 immediately and runs orchestrator in background
+      let fireRes: Response;
       try {
-        analyzeRes = await fetch("/api/analyze", {
+        fireRes = await fetch("/api/analyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sessionId }),
-          signal: abortCtrl.signal,
         });
       } catch {
-        // Network drop or timeout — the session is saved and the analysis may have
-        // completed on the server despite the client disconnecting (HTTP 499 pattern
-        // on mobile when the browser kills long-running requests). Clear the draft
-        // and send to History so the user can see the real state.
         clearInterval(interval);
-        clearTimeout(abortTimer);
         localStorage.removeItem(DRAFT_KEY);
         router.push("/fitness/sessions?analyzed=check");
         return;
+      }
+
+      if (!fireRes.ok) {
+        clearInterval(interval);
+        const errData = await fireRes.json().catch(() => ({})) as { error?: string };
+        throw new Error(errData.error ?? "Failed to start analysis");
+      }
+
+      // Poll /api/analyze/status every 3s until completed, failed, or 3-min timeout
+      const POLL_MS = 3_000;
+      const deadline = Date.now() + 3 * 60 * 1_000;
+      let result: AnalysisResult | null = null;
+      let analysisError: string | null = null;
+
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, POLL_MS));
+        try {
+          const statusRes = await fetch(`/api/analyze/status?sessionId=${sessionId}`);
+          const statusData = await statusRes.json() as {
+            status: string;
+            result?: AnalysisResult;
+            error?: string;
+          };
+          if (statusData.status === "completed" && statusData.result) {
+            result = statusData.result;
+            break;
+          } else if (statusData.status === "failed") {
+            analysisError = statusData.error ?? "Analysis failed";
+            break;
+          }
+          // "processing" or "not_found" → keep polling
+        } catch {
+          // Network hiccup on poll — keep trying
+        }
       }
 
       clearInterval(interval);
-      clearTimeout(abortTimer);
 
-      // Guard against HTML error pages (e.g. Railway 502 during a restart)
-      // returning instead of JSON — the raw SyntaxError is not user-friendly.
-      const contentType = analyzeRes.headers.get("content-type") ?? "";
-      if (!contentType.includes("application/json")) {
+      if (analysisError) {
+        setError(analysisError);
+        setStep("idle");
+        return;
+      }
+
+      if (!result) {
+        // 3-min deadline exceeded — result may still be saving to DB
         localStorage.removeItem(DRAFT_KEY);
         router.push("/fitness/sessions?analyzed=check");
         return;
       }
-
-      // Response is streamed with newline heartbeats; the actual JSON is the last
-      // non-empty line. Read the full stream before parsing.
-      let rawText = "";
-      try {
-        if (analyzeRes.body) {
-          const reader = analyzeRes.body.getReader();
-          const decoder = new TextDecoder();
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            rawText += decoder.decode(value, { stream: true });
-          }
-        } else {
-          rawText = await analyzeRes.text();
-        }
-      } catch {
-        // Railway dropped the connection mid-stream — the analysis still completed
-        // on the server and was saved to DB. Send user to sessions to check.
-        localStorage.removeItem(DRAFT_KEY);
-        router.push("/fitness/sessions?analyzed=check");
-        return;
-      }
-      const jsonLine = rawText.trim().split("\n").filter(Boolean).pop() ?? "{}";
-      const data = JSON.parse(jsonLine) as { error?: string };
-      if (!analyzeRes.ok) throw new Error(data.error ?? "Analysis failed");
 
       localStorage.removeItem(DRAFT_KEY);
-      setResult(data as AnalysisResult);
+      setResult(result);
       setStep("done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
