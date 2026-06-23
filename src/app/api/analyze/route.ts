@@ -187,12 +187,15 @@ export async function POST(req: NextRequest) {
     };
 
     const encoder = new TextEncoder();
+    let cancelled = false;
+
     const stream = new ReadableStream({
       async start(controller) {
         // Send newline heartbeats every 10s so Railway's proxy doesn't close
         // an idle connection before the orchestrator finishes (takes 70–100s).
         const heartbeat = setInterval(() => {
-          try { controller.enqueue(encoder.encode("\n")); } catch { /* closed */ }
+          if (cancelled) return;
+          try { controller.enqueue(encoder.encode("\n")); } catch { cancelled = true; }
         }, 10_000);
 
         try {
@@ -200,14 +203,27 @@ export async function POST(req: NextRequest) {
           const result = await runOrchestrator(input);
           console.log(`[analyze] completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
           clearInterval(heartbeat);
-          controller.enqueue(encoder.encode(JSON.stringify(result)));
-          controller.close();
+          if (!cancelled) {
+            try {
+              controller.enqueue(encoder.encode(JSON.stringify(result)));
+              controller.close();
+            } catch {
+              // Client disconnected just as result was ready — it was saved to DB
+            }
+          }
         } catch (err) {
           clearInterval(heartbeat);
           console.error("[POST /api/analyze]", err);
-          controller.enqueue(encoder.encode(JSON.stringify({ error: "Analysis failed" })));
-          controller.close();
+          if (!cancelled) {
+            try {
+              controller.enqueue(encoder.encode(JSON.stringify({ error: "Analysis failed" })));
+              controller.close();
+            } catch { /* client gone */ }
+          }
         }
+      },
+      cancel() {
+        cancelled = true;
       },
     });
 
