@@ -374,6 +374,18 @@ function SettingsContent() {
           </p>
         )}
       </section>
+
+      <section className="space-y-2">
+        <h2 className="text-xs text-zinc-500 uppercase tracking-wide">Help</h2>
+        <a
+          href="/help"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors"
+        >
+          How AgentStack works →
+        </a>
+      </section>
     </div>
   );
 }

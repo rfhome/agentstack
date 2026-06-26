@@ -23,11 +23,13 @@ type AgentResponse = {
   agentName: string; analysis: string; recommendations: string[];
   flags: string[]; nextSession: string; latencyMs: number;
 };
+type AchievedGoal = { exercise: string; prevTargetLbs: number; newTargetLbs: number };
 type AnalysisResult = {
   recommendation: { content: string; nextActions: string[] };
   agentResponses: AgentResponse[];
   suggestedRating?: "A" | "B" | "C";
   ratingReason?: string;
+  achievedGoals?: AchievedGoal[];
 };
 type Prescription = {
   cycleLabel: string;
@@ -543,6 +545,21 @@ function LogSessionPageInner() {
           <h1 className="text-2xl font-bold text-white">Analysis Complete</h1>
           <p className="text-sm text-zinc-500">Nexus has reviewed your session.</p>
         </div>
+
+        {/* Goal achievements */}
+        {result.achievedGoals && result.achievedGoals.length > 0 && (
+          <div className="rounded-xl border border-emerald-800 bg-emerald-900/20 p-4 space-y-2">
+            <p className="text-xs text-emerald-400 uppercase tracking-wide font-medium">Goal{result.achievedGoals.length > 1 ? "s" : ""} achieved!</p>
+            {result.achievedGoals.map((g, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <span className="text-sm font-medium text-white">{g.exercise}</span>
+                <span className="text-xs text-zinc-400">
+                  {g.prevTargetLbs}lbs → new target: <span className="text-emerald-400 font-semibold">{g.newTargetLbs}lbs</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Suggested rating */}
         {result.suggestedRating && !displayRating && (

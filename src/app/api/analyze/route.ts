@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
-import { setJob } from "@/lib/analyze-jobs";
+import { setJob, type AchievedGoal } from "@/lib/analyze-jobs";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
@@ -47,6 +48,59 @@ function toSessionSummary(s: {
       avgHR: c.avgHR,
     })),
   };
+}
+
+type GoalRow = { id: number; exercise: string; targetWeightLbs: number | null; targetReps: string | null };
+type ExerciseRow = { name: string; weightLbs: number | null; weights: string | null; reps: string | null };
+
+async function checkAndUpdateGoals(
+  userId: string,
+  exercises: ExerciseRow[],
+  goals: GoalRow[]
+): Promise<AchievedGoal[]> {
+  const achieved: AchievedGoal[] = [];
+
+  for (const goal of goals) {
+    const match = exercises.find((ex) => {
+      const a = ex.name.toLowerCase().trim();
+      const b = goal.exercise.toLowerCase().trim();
+      return a.includes(b) || b.includes(a);
+    });
+    if (!match) continue;
+
+    // Max weight used across all sets for this exercise
+    let maxWeight = match.weightLbs ?? 0;
+    if (match.weights) {
+      const parsed = match.weights.split(",").map((w) => parseFloat(w.trim())).filter((w) => !isNaN(w));
+      if (parsed.length > 0) maxWeight = Math.max(...parsed);
+    }
+
+    // Weight target met?
+    const weightOk = goal.targetWeightLbs == null || maxWeight >= goal.targetWeightLbs;
+
+    // Reps target met? (compare minimum reps in session to first number in target string)
+    let repsOk = true;
+    if (goal.targetReps && match.reps) {
+      const targetMin = parseInt(goal.targetReps);
+      const sessionReps = match.reps.split(",").map((r) => parseInt(r.trim())).filter((r) => !isNaN(r));
+      const minSessionReps = sessionReps.length > 0 ? Math.min(...sessionReps) : 0;
+      if (!isNaN(targetMin)) repsOk = minSessionReps >= targetMin;
+    }
+
+    if (!weightOk || !repsOk) continue;
+
+    const prevTargetLbs = goal.targetWeightLbs ?? maxWeight;
+    const newTargetLbs = prevTargetLbs + 5;
+
+    await prisma.goal.update({ where: { id: goal.id }, data: { achieved: true, achievedAt: new Date() } });
+    await prisma.goal.create({
+      data: { userId, exercise: goal.exercise, targetWeightLbs: newTargetLbs, targetReps: goal.targetReps },
+    });
+
+    achieved.push({ exercise: goal.exercise, prevTargetLbs, newTargetLbs });
+  }
+
+  return achieved;
 }
 
 export async function POST(req: NextRequest) {
@@ -194,9 +248,13 @@ export async function POST(req: NextRequest) {
     const t0 = Date.now();
 
     runOrchestrator(input)
-      .then((result) => {
+      .then(async (orchestratorResult) => {
+        const achievedGoals = await checkAndUpdateGoals(userId, session!.exercises, goals);
         console.log(`[analyze] session ${sessionId} completed in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
-        setJob(sessionId, { status: "completed", result });
+        setJob(sessionId, {
+          status: "completed",
+          result: { ...orchestratorResult, achievedGoals: achievedGoals.length > 0 ? achievedGoals : undefined },
+        });
       })
       .catch((err: unknown) => {
         console.error(`[analyze] session ${sessionId} failed after ${((Date.now() - t0) / 1000).toFixed(1)}s:`, err);
