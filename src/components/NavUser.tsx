@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useSession, signOut } from "next-auth/react";
 
 // Deterministic color from a string — cycles through a muted palette
@@ -43,13 +44,13 @@ export default function NavUser() {
       >
         Sign out
       </button>
-      {/* Avatar — initials with deterministic color, or OAuth profile photo */}
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden ${image ? "" : bg}`}>
+      {/* Avatar — links to Profile */}
+      <Link href="/profile" className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 overflow-hidden hover:ring-2 hover:ring-zinc-500 transition-all ${image ? "" : bg}`}>
         {image
           ? <img src={image} alt={session.user.name ?? "avatar"} className="w-full h-full object-cover" />
           : letters
         }
-      </div>
+      </Link>
     </div>
   );
 }
