@@ -678,6 +678,19 @@ function LogSessionPageInner() {
               {rating && <p className="font-semibold text-zinc-300">{rating}</p>}
             </div>
           </div>
+          {warmupItems.length > 0 && (
+            <div className="space-y-1 border-t border-zinc-800 pt-3">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Warmup</p>
+              {warmupItems.map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <span className={item.done ? "text-emerald-400" : "text-zinc-600"}>
+                    {item.done ? "✓" : "–"}
+                  </span>
+                  <span className={item.done ? "text-zinc-300" : "text-zinc-600"}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+          )}
           {savedExercises.length > 0 && (
             <div className="space-y-1 border-t border-zinc-800 pt-3">
               {savedExercises.map((ex, i) => (
@@ -702,6 +715,19 @@ function LogSessionPageInner() {
                     {c.distanceMi ? ` · ${c.distanceMi}mi` : ""}
                     {c.avgHR ? ` · ${c.avgHR}bpm` : ""}
                   </span>
+                </div>
+              ))}
+            </div>
+          )}
+          {finisherItems.length > 0 && (
+            <div className="space-y-1 border-t border-zinc-800 pt-3">
+              <p className="text-xs text-zinc-500 uppercase tracking-wide">Finisher</p>
+              {finisherItems.map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-sm">
+                  <span className={item.done ? "text-emerald-400" : "text-zinc-600"}>
+                    {item.done ? "✓" : "–"}
+                  </span>
+                  <span className={item.done ? "text-zinc-300" : "text-zinc-600"}>{item.label}</span>
                 </div>
               ))}
             </div>
