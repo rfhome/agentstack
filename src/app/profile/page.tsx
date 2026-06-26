@@ -82,12 +82,27 @@ function MarkdownView({ text }: { text: string }) {
   return <div className="space-y-1.5">{nodes}</div>;
 }
 
+type Goal = {
+  id: number;
+  exercise: string;
+  targetWeightLbs: number | null;
+  targetReps: string | null;
+  achieved: boolean;
+  achievedAt: string | null;
+};
+
 export default function ProfilePage() {
   const [name, setName] = useState("");
   const [context, setContext] = useState("");
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [addingGoal, setAddingGoal] = useState(false);
+  const [newExercise, setNewExercise] = useState("");
+  const [newWeight, setNewWeight] = useState("");
+  const [newReps, setNewReps] = useState("");
 
   useEffect(() => {
     fetch("/api/profile")
@@ -98,7 +113,51 @@ export default function ProfilePage() {
         setDraft(data.context ?? "");
         if (!data.context) setEditing(true);
       });
+    fetch("/api/goals")
+      .then((r) => r.json())
+      .then((data: Goal[]) => setGoals(data));
   }, []);
+
+  async function handleAddGoal() {
+    if (!newExercise.trim()) return;
+    const res = await fetch("/api/goals", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        exercise: newExercise.trim(),
+        targetWeightLbs: newWeight ? parseFloat(newWeight) : null,
+        targetReps: newReps.trim() || null,
+      }),
+    });
+    if (res.ok) {
+      const goal = await res.json() as Goal;
+      setGoals((g) => [goal, ...g]);
+      setNewExercise("");
+      setNewWeight("");
+      setNewReps("");
+      setAddingGoal(false);
+    }
+  }
+
+  async function handleMarkAchieved(id: number) {
+    const res = await fetch(`/api/goals/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ achieved: true }),
+    });
+    if (res.ok) {
+      setGoals((g) =>
+        g.map((goal) =>
+          goal.id === id ? { ...goal, achieved: true, achievedAt: new Date().toISOString() } : goal
+        )
+      );
+    }
+  }
+
+  async function handleDeleteGoal(id: number) {
+    const res = await fetch(`/api/goals/${id}`, { method: "DELETE" });
+    if (res.ok) setGoals((g) => g.filter((goal) => goal.id !== id));
+  }
 
   function handleEdit() {
     setDraft(context);
@@ -212,6 +271,125 @@ export default function ProfilePage() {
             <p className="text-sm text-red-400">Failed to save. Please try again.</p>
           )}
         </div>
+      </div>
+
+      {/* Goals */}
+      <div className="border-t border-zinc-800 pt-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-zinc-300">Strength Goals</p>
+            <p className="text-xs text-zinc-500 mt-0.5">Tracked automatically during analysis.</p>
+          </div>
+          {!addingGoal && (
+            <button
+              onClick={() => setAddingGoal(true)}
+              className="text-xs px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+            >
+              + Add
+            </button>
+          )}
+        </div>
+
+        {/* Active goals */}
+        {goals.filter((g) => !g.achieved).length === 0 && !addingGoal && (
+          <p className="text-xs text-zinc-600 italic">No active goals. Add one or run an analysis to auto-generate.</p>
+        )}
+        {goals.filter((g) => !g.achieved).map((goal) => (
+          <div key={goal.id} className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5 gap-3">
+            <div className="min-w-0">
+              <span className="text-sm text-white">{goal.exercise}</span>
+              {(goal.targetWeightLbs || goal.targetReps) && (
+                <span className="text-xs text-zinc-500 ml-2">
+                  {goal.targetWeightLbs ? `${goal.targetWeightLbs}lbs` : ""}
+                  {goal.targetWeightLbs && goal.targetReps ? " × " : ""}
+                  {goal.targetReps ? `${goal.targetReps} reps` : ""}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => handleMarkAchieved(goal.id)}
+                title="Mark achieved"
+                className="text-xs text-zinc-600 hover:text-emerald-400 transition-colors"
+              >
+                ✓
+              </button>
+              <button
+                onClick={() => handleDeleteGoal(goal.id)}
+                title="Delete goal"
+                className="text-xs text-zinc-600 hover:text-red-400 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+
+        {/* Add goal form */}
+        {addingGoal && (
+          <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 space-y-2">
+            <input
+              type="text"
+              value={newExercise}
+              onChange={(e) => setNewExercise(e.target.value)}
+              placeholder="Exercise name"
+              autoFocus
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 text-sm"
+            />
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={newWeight}
+                onChange={(e) => setNewWeight(e.target.value)}
+                placeholder="Target lbs"
+                className="w-1/2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 text-sm"
+              />
+              <input
+                type="text"
+                value={newReps}
+                onChange={(e) => setNewReps(e.target.value)}
+                placeholder="Reps (e.g. 10)"
+                className="w-1/2 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-white placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-zinc-600 text-sm"
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleAddGoal}
+                disabled={!newExercise.trim()}
+                className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+              >
+                Add Goal
+              </button>
+              <button
+                onClick={() => { setAddingGoal(false); setNewExercise(""); setNewWeight(""); setNewReps(""); }}
+                className="text-sm text-zinc-500 hover:text-zinc-300 transition-colors px-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Recently achieved */}
+        {goals.filter((g) => g.achieved).length > 0 && (
+          <div className="space-y-1.5 pt-1">
+            <p className="text-xs text-zinc-600 uppercase tracking-wide">Recently achieved</p>
+            {goals.filter((g) => g.achieved).slice(0, 5).map((goal) => (
+              <div key={goal.id} className="flex items-center justify-between text-xs text-zinc-600">
+                <span className="line-through">
+                  {goal.exercise}
+                  {goal.targetWeightLbs ? ` — ${goal.targetWeightLbs}lbs` : ""}
+                  {goal.targetReps ? ` × ${goal.targetReps}` : ""}
+                </span>
+                {goal.achievedAt && (
+                  <span className="text-emerald-700 shrink-0 ml-2">
+                    ✓ {new Date(goal.achievedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="border-t border-zinc-800 pt-4">

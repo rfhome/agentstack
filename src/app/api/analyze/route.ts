@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { setJob, type AchievedGoal } from "@/lib/analyze-jobs";
+import { exerciseMatchesGoal, getMaxWeight, meetsWeightTarget, meetsRepsTarget } from "@/lib/goals";
 import { getUserContext } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
@@ -61,33 +62,12 @@ async function checkAndUpdateGoals(
   const achieved: AchievedGoal[] = [];
 
   for (const goal of goals) {
-    const match = exercises.find((ex) => {
-      const a = ex.name.toLowerCase().trim();
-      const b = goal.exercise.toLowerCase().trim();
-      return a.includes(b) || b.includes(a);
-    });
+    const match = exercises.find((ex) => exerciseMatchesGoal(ex.name, goal.exercise));
     if (!match) continue;
 
-    // Max weight used across all sets for this exercise
-    let maxWeight = match.weightLbs ?? 0;
-    if (match.weights) {
-      const parsed = match.weights.split(",").map((w) => parseFloat(w.trim())).filter((w) => !isNaN(w));
-      if (parsed.length > 0) maxWeight = Math.max(...parsed);
-    }
-
-    // Weight target met?
-    const weightOk = goal.targetWeightLbs == null || maxWeight >= goal.targetWeightLbs;
-
-    // Reps target met? (compare minimum reps in session to first number in target string)
-    let repsOk = true;
-    if (goal.targetReps && match.reps) {
-      const targetMin = parseInt(goal.targetReps);
-      const sessionReps = match.reps.split(",").map((r) => parseInt(r.trim())).filter((r) => !isNaN(r));
-      const minSessionReps = sessionReps.length > 0 ? Math.min(...sessionReps) : 0;
-      if (!isNaN(targetMin)) repsOk = minSessionReps >= targetMin;
-    }
-
-    if (!weightOk || !repsOk) continue;
+    const maxWeight = getMaxWeight(match.weightLbs, match.weights);
+    if (!meetsWeightTarget(maxWeight, goal.targetWeightLbs)) continue;
+    if (!meetsRepsTarget(match.reps, goal.targetReps)) continue;
 
     const prevTargetLbs = goal.targetWeightLbs ?? maxWeight;
     const newTargetLbs = prevTargetLbs + 5;

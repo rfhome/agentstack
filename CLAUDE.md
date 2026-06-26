@@ -35,11 +35,27 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
   - Lens: strip `images` from JSON, pass as Gemini `inlineData` parts — base64 embedded in JSON text exceeds Gemini's token limit and silently kills the agent
   - Nexus: strip `images` from JSON, pass as Anthropic vision content blocks
 
+### Async analysis
+- `POST /api/analyze` returns 202 immediately; starts orchestrator in background via fire-and-forget promise (safe because Railway runs persistent Node.js, not serverless)
+- Job state stored in module-level `Map<number, JobState>` in `src/lib/analyze-jobs.ts` — survives request boundaries, auto-cleaned after 15 min
+- Client polls `GET /api/analyze/status?sessionId=N` every 3s (up to 3 min)
+- Status endpoint checks in-memory map first; falls back to DB (Recommendation + AgentLog records) if server restarted
+- After orchestrator completes, `checkAndUpdateGoals()` runs before setting job to "completed" — pure matching logic is in `src/lib/goals.ts`
+- `suggestedRating` and `ratingReason` are persisted to the `Recommendation` table so they survive server restarts
+
+### Goals
+- Pure matching logic lives in `src/lib/goals.ts`: `exerciseMatchesGoal`, `getMaxWeight`, `meetsWeightTarget`, `meetsRepsTarget`
+- DB operations (mark achieved, create progressive goal at +5lbs) stay in `src/app/api/analyze/route.ts`
+- Goal achievement triggers: exercise name substring match (case-insensitive) + weight ≥ target + all set reps ≥ target min
+- `targetReps` strings like "8-10" are parsed by taking the first integer (parseInt stops at "-")
+- Profile page (`/profile`) lists active and recently achieved goals; users can add, mark achieved, or delete
+
 ### Tests
 - Framework: Vitest (`npm test` / `npm run test:watch`)
 - Test files: `src/**/*.test.ts`
 - Tests live in `__tests__/` subdirectory next to the code they test
 - Do not import Prisma, Next.js, or API routes in unit tests — test pure logic only
+- When adding new features, extract pure logic to a lib file and test it; keep DB/API calls in route handlers
 
 ### Streaks
 - Pure logic in `src/lib/streaks.ts`: `computeStreaks(dates[], now?)` → `StreakStats`

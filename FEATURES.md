@@ -50,7 +50,8 @@
 
 ### Profile & goals
 - [x] Profile editor (/profile) — edit name and full training context markdown
-- [x] Goals tracker — target weight/reps per exercise, mark achieved
+- [x] Goals tracker — target weight/reps per exercise; Profile page lists active goals with mark-achieved and delete; achieved goals shown with date
+- [x] Goal auto-achievement — after each analysis, `checkAndUpdateGoals()` compares session exercises to active goals; on match (name + weight + reps) marks achieved, creates +5lbs progressive goal, returns list to client for celebration banner
 - [x] Recommendations feed on fitness dashboard
 
 ### Activity logging (standalone, non-gym)
@@ -69,7 +70,8 @@
 - [x] Dashboard sections collapsible (This Week, Recommendations, Goals, Recent Activities, Recent Sessions) — chevron toggle, defaults open
 - [x] Log Activity button in dashboard header next to Log Session; refreshes server components on save
 - [x] "Redo setup wizard" link on Profile page
-- [x] Save & Analyze has 120s client timeout with readable fallback message ("session was saved — retry from History") instead of opaque browser "Failed to fetch"
+- [x] Async Save & Analyze — POST /api/analyze returns 202 immediately, orchestrator runs in background (Railway persistent Node.js); client polls GET /api/analyze/status?sessionId=N every 3s; survives Railway proxy timeout; rating + goal achievements shown inline on completion
+- [x] Warmup and finisher checklist items shown in the analyzing summary screen with ✓/– status
 
 ### Deployment
 - [x] Railway deployment with PostgreSQL
@@ -83,7 +85,8 @@
 ## Backlog
 
 ### Near-term
-- [ ] **Async analysis + push notifications** — save session → background job → Web Push notification when agents finish → user taps to see results and accept rating. Eliminates the 30–60s blocking spinner. Requires service worker, Web Push subscription per device, and a job queue or polling endpoint.
+- [ ] **Web Push notifications** — notify user on phone when async analysis completes. Requires service worker + Web Push subscription per device.
+- [ ] **Goals management UI** — edit target weight/reps on existing goals (currently add/delete/mark-achieved only).
 
 ### Medium-term
 - [ ] **ChatGPT conversation import** — parse ChatGPT data export to seed historical session records
