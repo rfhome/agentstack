@@ -87,6 +87,8 @@
 ### Near-term
 - [ ] **Web Push notifications** — notify user on phone when async analysis completes. Requires service worker + Web Push subscription per device.
 - [ ] **Goals management UI** — edit target weight/reps on existing goals (currently add/delete/mark-achieved only).
+- [x] **Weekly summary auto-generation** — `POST /api/internal/weekly-summary-cron` generates summaries for all active users every Sunday via Railway cron job (`0 8 * * 0`); skips users already summarized this week. "New" badge shown in card until next Sunday.
+- [x] **Copyright footer** — `© [year] AgentStack` footer in root layout, visible on all pages.
 
 ### Medium-term
 - [ ] **ChatGPT conversation import** — parse ChatGPT data export to seed historical session records

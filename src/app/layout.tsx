@@ -69,6 +69,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <main className="max-w-2xl mx-auto px-4 py-6 pb-24 md:pb-6">{children}</main>
 
           <FeedbackButton />
+
+          <footer className="border-t border-zinc-800/50 mt-8 py-4 px-4 text-center">
+            <p className="text-xs text-zinc-600">© {new Date().getFullYear()} AgentStack. All rights reserved.</p>
+          </footer>
         </AuthProvider>
       </body>
     </html>

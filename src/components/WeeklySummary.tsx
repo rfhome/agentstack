@@ -18,8 +18,6 @@ type StoredSummary = {
 };
 
 function parseStoredSummary(stored: StoredSummary): WeeklySummaryData | null {
-  // The content is the narrative paragraph; nextActions is JSON array.
-  // weekOf, headline, and stats are not stored separately — reconstruct what we can.
   try {
     const actions = Array.isArray(stored.nextActions) ? (stored.nextActions as string[]) : [];
     return {
@@ -34,10 +32,21 @@ function parseStoredSummary(stored: StoredSummary): WeeklySummaryData | null {
   }
 }
 
+function isNewThisWeek(createdAt: string | null): boolean {
+  if (!createdAt) return false;
+  const now = new Date();
+  const lastSunday = new Date(now);
+  lastSunday.setDate(now.getDate() - now.getDay());
+  lastSunday.setHours(0, 0, 0, 0);
+  return new Date(createdAt) >= lastSunday;
+}
+
 export function WeeklySummary() {
   const [summary, setSummary] = useState<WeeklySummaryData | null>(null);
+  const [summaryCreatedAt, setSummaryCreatedAt] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string>("");
+  const [quiet, setQuiet] = useState<string>("");
 
   useEffect(() => {
     fetch("/api/weekly-summary")
@@ -45,6 +54,7 @@ export function WeeklySummary() {
       .then((data: { summary: StoredSummary | null }) => {
         if (data.summary) {
           setSummary(parseStoredSummary(data.summary));
+          setSummaryCreatedAt(data.summary.createdAt);
         }
       })
       .catch(() => {
@@ -55,14 +65,14 @@ export function WeeklySummary() {
   async function generate() {
     setGenerating(true);
     setError("");
+    setQuiet("");
     try {
       const res = await fetch("/api/weekly-summary", { method: "POST" });
-      if (!res.ok) {
-        const body = (await res.json()) as { error?: string };
-        throw new Error(body.error ?? "Generation failed");
-      }
-      const data = (await res.json()) as WeeklySummaryData;
-      setSummary(data);
+      const body = await res.json() as { quiet?: string; error?: string } & Partial<WeeklySummaryData>;
+      if (body.quiet) { setQuiet(body.quiet); return; }
+      if (!res.ok) throw new Error(body.error ?? "Generation failed");
+      setSummary(body as WeeklySummaryData);
+      setSummaryCreatedAt(new Date().toISOString());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -94,16 +104,21 @@ export function WeeklySummary() {
   if (!summary) {
     return (
       <div className="space-y-2">
+        {quiet && <p className="text-zinc-500 text-sm">{quiet}</p>}
         {error && <p className="text-red-400 text-xs">{error}</p>}
-        <button
-          onClick={generate}
-          className="rounded-lg bg-zinc-800 text-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-700 transition-colors"
-        >
-          Generate weekly summary
-        </button>
+        {!quiet && (
+          <button
+            onClick={generate}
+            className="rounded-lg bg-zinc-800 text-zinc-300 px-4 py-2 text-sm font-medium hover:bg-zinc-700 transition-colors"
+          >
+            Generate weekly summary
+          </button>
+        )}
       </div>
     );
   }
+
+  const isNew = isNewThisWeek(summaryCreatedAt);
 
   return (
     <div className="rounded-xl border border-zinc-700 bg-zinc-900 p-5 space-y-3">
@@ -113,6 +128,11 @@ export function WeeklySummary() {
         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-200">Nexus</span>
         {summary.weekOf && (
           <span className="text-xs text-zinc-500">{summary.weekOf}</span>
+        )}
+        {isNew && (
+          <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-emerald-900/60 text-emerald-400 border border-emerald-800">
+            New
+          </span>
         )}
       </div>
 

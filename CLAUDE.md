@@ -57,6 +57,13 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - Do not import Prisma, Next.js, or API routes in unit tests — test pure logic only
 - When adding new features, extract pure logic to a lib file and test it; keep DB/API calls in route handlers
 
+### Weekly summary
+- Shared generation logic in `src/lib/weekly-summary.ts`: `generateWeeklySummary(userId, userName)` — queries sessions, fetches Oura if connected, calls Nexus, persists to `Recommendation` table with `domain: "weekly"`
+- `POST /api/weekly-summary` (user-triggered) calls the shared function directly
+- `POST /api/internal/weekly-summary-cron` — Railway cron endpoint; secured by `Authorization: Bearer $CRON_SECRET`; loops all `status: "active"` users; skips users who already have a `domain: "weekly"` record since the most recent Sunday UTC; logs results
+- Railway cron: schedule `0 8 * * 0` (8am UTC every Sunday), command: `curl -X POST https://<app>.railway.app/api/internal/weekly-summary-cron -H "Authorization: Bearer $CRON_SECRET"`
+- "New" badge shown in `WeeklySummary` card when `createdAt` is on or after the most recent Sunday midnight local time
+
 ### Streaks
 - Pure logic in `src/lib/streaks.ts`: `computeStreaks(dates[], now?)` → `StreakStats`
 - `weekStart(date)` returns Monday 00:00 of the containing week; `weekKey(monday)` returns YYYY-MM-DD
