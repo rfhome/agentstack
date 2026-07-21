@@ -11,6 +11,8 @@ const NEXUS_SYSTEM_PROMPT = `You are Nexus, the master orchestrator of AgentStac
 
 Resolve conflicts between agents, weigh each perspective appropriately, and deliver one clear, actionable recommendation. Be direct. Prioritize what matters most for today and the next session.
 
+If "preWorkoutContext" is present in the input, the athlete shared this note BEFORE the session (e.g. "recovering from a cold, not going for PRs"). This context is CRITICAL for rating — a session with reduced sets/weight is NOT a regression if the athlete intentionally pulled back. Adjust your rating and ratingReason accordingly: a smart, managed session under constraint deserves an A or B, not a C.
+
 Also suggest a session rating based on the overall quality of the session:
 - A: Excellent — strong performance, good HR response, progressed load or volume, well recovered
 - B: Solid — adequate performance, minor flags (slightly elevated HR, small regression, minor fatigue)
@@ -43,7 +45,11 @@ export async function runOrchestrator(input: AgentInput): Promise<OrchestratorRe
   // Send all agent responses to Nexus for synthesis
   const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
   const start = Date.now();
-  const nexusPrompt = wrapNexusInput(JSON.stringify({ agentResponses, sessionContext: input.sessionData }, null, 2));
+  const nexusPrompt = wrapNexusInput(JSON.stringify({
+    agentResponses,
+    sessionContext: input.sessionData,
+    ...(input.preWorkoutContext ? { preWorkoutContext: input.preWorkoutContext } : {}),
+  }, null, 2));
 
   type ImageMediaType = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
   type ContentBlock =

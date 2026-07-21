@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
         activeZoneMinutes?: number;
         rating?: string;
         notes?: string;
+        preWorkoutContext?: string;
       };
       exercises: {
         name: string;
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
     // Injection check — scan all user-supplied text fields before saving or sending to agents
     const injectionFields: Record<string, string | null | undefined> = {
       notes: session.notes,
+      preWorkoutContext: session.preWorkoutContext,
       ...Object.fromEntries((exercises ?? []).flatMap((e, i) => [
         [`exercise_${i}_name`, e.name],
         [`exercise_${i}_notes`, e.notes],

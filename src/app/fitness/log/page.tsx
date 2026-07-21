@@ -349,6 +349,7 @@ function LogSessionPageInner() {
           activeZoneMinutes: azm ? parseInt(azm) : undefined,
           rating: rating || undefined,
           notes: notes || undefined,
+          preWorkoutContext: workoutContext.trim() || undefined,
         },
         exercises: exercises
           .filter((ex) => ex.name.trim())
@@ -545,6 +546,13 @@ function LogSessionPageInner() {
           <h1 className="text-2xl font-bold text-white">Analysis Complete</h1>
           <p className="text-sm text-zinc-500">Nexus has reviewed your session.</p>
         </div>
+
+        {workoutContext.trim() && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Pre-session note</p>
+            <p className="text-sm text-zinc-400 italic">&ldquo;{workoutContext.trim()}&rdquo;</p>
+          </div>
+        )}
 
         {/* Goal achievements */}
         {result.achievedGoals && result.achievedGoals.length > 0 && (
@@ -750,6 +758,12 @@ function LogSessionPageInner() {
             </div>
           )}
         </div>
+        {workoutContext.trim() && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Pre-session note</p>
+            <p className="text-sm text-zinc-400 italic">&ldquo;{workoutContext.trim()}&rdquo;</p>
+          </div>
+        )}
       </div>
     );
   }

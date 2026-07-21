@@ -113,6 +113,7 @@ export async function POST(req: NextRequest) {
         db.session.findUnique({
           where: { id: sessionId, userId },
           include: { exercises: true, cardioActivities: true },
+          // preWorkoutContext is selected via the model default (all scalar fields)
         }),
         db.session.findMany({
           where: { userId, id: { not: sessionId } },
@@ -198,6 +199,7 @@ export async function POST(req: NextRequest) {
       sessionId,
       userId,
       sessionData: toSessionSummary(session),
+      preWorkoutContext: session.preWorkoutContext ?? undefined,
       recentHistory: recentSessions.map(toSessionSummary),
       goals: goals.map((g: { exercise: string; targetWeightLbs: number | null; targetReps: string | null }) => ({
         exercise: g.exercise,

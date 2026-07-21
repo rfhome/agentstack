@@ -81,6 +81,7 @@ model Session {
   activeZoneMinutes Int?
   rating            String?
   notes             String?
+  preWorkoutContext String?
   exercises         Exercise[]
   cardioActivities  CardioActivity[]
   agentLogs         AgentLog[]

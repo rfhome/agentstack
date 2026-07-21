@@ -47,6 +47,7 @@ export interface AgentInput {
   recentHistory: SessionSummary[];
   goals: { exercise: string; targetWeightLbs: number; targetReps: string }[];
   userContext: string;
+  preWorkoutContext?: string; // athlete's note entered before requesting the workout plan
   ouraContext?: string;
   fitbitContext?: string;
   appleHealthContext?: string;          // formatted Apple Health daily summaries (last 7 days)
