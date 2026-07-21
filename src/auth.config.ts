@@ -21,7 +21,8 @@ export const authConfig: NextAuthConfig = {
       // Token-authenticated webhooks — no session required
       const isPublicWebhook = nextUrl.pathname.startsWith("/api/wearables/apple-health/ingest");
       const isHelpPage = nextUrl.pathname === "/help";
-      if (isAuthPage || isApiAuth || isPublicWebhook || isHelpPage) return true;
+      const isInternalCron = nextUrl.pathname.startsWith("/api/internal/");
+      if (isAuthPage || isApiAuth || isPublicWebhook || isHelpPage || isInternalCron) return true;
       return isLoggedIn;
     },
   },
