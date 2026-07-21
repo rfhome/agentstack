@@ -1,6 +1,0 @@
-[build]
-builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile.cron"
-
-[deploy]
-startCommand = "curl -X POST https://agentstack-production-19f9.up.railway.app/api/internal/weekly-summary-cron -H \"Authorization: Bearer $CRON_SECRET\""
