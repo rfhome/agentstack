@@ -5,7 +5,7 @@ import { auth } from "@/auth";
 import { runOrchestrator } from "@/lib/agents/orchestrator";
 import { setJob, type AchievedGoal } from "@/lib/analyze-jobs";
 import { exerciseMatchesGoal, getMaxWeight, meetsWeightTarget, meetsRepsTarget } from "@/lib/goals";
-import { getUserContext } from "@/lib/context/userProfile";
+import { getUserContext, getStandingDirective } from "@/lib/context/userProfile";
 import { fetchOuraData, formatOuraForLens, type OuraData, type OuraReadiness, type OuraSleep } from "@/lib/oura";
 import { fetchFitbitData, formatFitbitForAgents } from "@/lib/fitbit";
 import { formatAppleHealthForLens } from "@/lib/apple-health";
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
 
     const sessionDateCutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [session, recentSessions, goals, userContext, ouraConn, fitbitConn, recentActivitiesRaw, appleHealthDays] = await withRLS(userId, (db) =>
+    const [session, recentSessions, goals, userContext, standingDirective, ouraConn, fitbitConn, recentActivitiesRaw, appleHealthDays] = await withRLS(userId, (db) =>
       Promise.all([
         db.session.findUnique({
           where: { id: sessionId, userId },
@@ -123,6 +123,7 @@ export async function POST(req: NextRequest) {
         }),
         db.goal.findMany({ where: { userId, achieved: false } }),
         getUserContext(userId, db),
+        getStandingDirective(userId, db),
         db.wearableConnection.findUnique({
           where: { userId_provider: { userId, provider: "oura" } },
           select: { id: true },
@@ -200,6 +201,7 @@ export async function POST(req: NextRequest) {
       userId,
       sessionData: toSessionSummary(session),
       preWorkoutContext: session.preWorkoutContext ?? undefined,
+      standingDirective: standingDirective ?? undefined,
       recentHistory: recentSessions.map(toSessionSummary),
       goals: goals.map((g: { exercise: string; targetWeightLbs: number | null; targetReps: string | null }) => ({
         exercise: g.exercise,

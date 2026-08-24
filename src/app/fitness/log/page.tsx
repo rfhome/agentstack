@@ -108,6 +108,12 @@ function LogSessionPageInner() {
   const [loadingWorkout, setLoadingWorkout] = useState(false);
   const [prescription, setPrescription] = useState<Prescription | null>(null);
   const [workoutContext, setWorkoutContext] = useState("");
+  const [standingNote, setStandingNote] = useState<string | null>(null);
+  const [standingNoteExpiresAt, setStandingNoteExpiresAt] = useState<string | null>(null);
+  const [editingStandingNote, setEditingStandingNote] = useState(false);
+  const [standingNoteDraft, setStandingNoteDraft] = useState("");
+  const [standingNoteDaysDraft, setStandingNoteDaysDraft] = useState("10");
+  const [savingStandingNote, setSavingStandingNote] = useState(false);
   const [images, setImages] = useState<{ data: string; mediaType: string; name: string }[]>([]);
   const [step, setStep] = useState<"idle" | "saving" | "analyzing" | "done" | "saved">("idle");
   const [analyzeStep, setAnalyzeStep] = useState(0);
@@ -176,6 +182,17 @@ function LogSessionPageInner() {
       })
       .catch(() => { /* ignore — user can fill manually */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load any active standing directive
+  useEffect(() => {
+    fetch("/api/standing-note")
+      .then((r) => r.json())
+      .then((d: { note: string | null; expiresAt: string | null }) => {
+        setStandingNote(d.note);
+        setStandingNoteExpiresAt(d.expiresAt);
+      })
+      .catch(() => { /* silent */ });
   }, []);
 
   // Pre-load image shared via PWA Web Share Target (?shareId=xxx)
@@ -296,6 +313,38 @@ function LogSessionPageInner() {
       // silent
     } finally {
       setFillingFitbit(false);
+    }
+  }
+
+  async function saveStandingNote() {
+    if (!standingNoteDraft.trim()) return;
+    setSavingStandingNote(true);
+    try {
+      const days = standingNoteDaysDraft ? parseInt(standingNoteDaysDraft) : null;
+      const res = await fetch("/api/standing-note", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: standingNoteDraft.trim(), days }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setStandingNote(data.note);
+      setStandingNoteExpiresAt(data.expiresAt);
+      setEditingStandingNote(false);
+      setStandingNoteDraft("");
+    } finally {
+      setSavingStandingNote(false);
+    }
+  }
+
+  async function clearStandingNote() {
+    setSavingStandingNote(true);
+    try {
+      await fetch("/api/standing-note", { method: "DELETE" });
+      setStandingNote(null);
+      setStandingNoteExpiresAt(null);
+    } finally {
+      setSavingStandingNote(false);
     }
   }
 
@@ -791,6 +840,79 @@ function LogSessionPageInner() {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Standing directive — a temporary, multi-session rule (e.g. "no PRs while adjusting to a wrist wrap") */}
+        {standingNote ? (
+          <div className="rounded-xl border border-blue-800 bg-blue-900/20 p-3 flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs text-blue-400 uppercase tracking-wide font-medium mb-1">Standing directive</p>
+              <p className="text-sm text-zinc-200">{standingNote}</p>
+              <p className="text-xs text-zinc-500 mt-1">
+                {standingNoteExpiresAt
+                  ? `Active until ${new Date(standingNoteExpiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                  : "No expiry — clear manually when done"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={clearStandingNote}
+              disabled={savingStandingNote}
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors shrink-0 disabled:opacity-50"
+            >
+              Clear
+            </button>
+          </div>
+        ) : editingStandingNote ? (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 space-y-2.5">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide">Set a standing directive</p>
+            <textarea
+              value={standingNoteDraft}
+              onChange={(e) => setStandingNoteDraft(e.target.value)}
+              placeholder="e.g. 'no PRs, hold weights flat — adjusting to a wrist wrap for the next couple cycles'"
+              rows={2}
+              className="w-full rounded-lg bg-zinc-950 border border-zinc-800 px-3 py-2 text-sm text-zinc-300 placeholder-zinc-600 focus:outline-none focus:border-zinc-600 resize-none"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-zinc-500">Expires in</label>
+              <select
+                value={standingNoteDaysDraft}
+                onChange={(e) => setStandingNoteDaysDraft(e.target.value)}
+                className="rounded-lg bg-zinc-950 border border-zinc-800 px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-zinc-600"
+              >
+                <option value="7">7 days</option>
+                <option value="10">10 days</option>
+                <option value="14">14 days</option>
+                <option value="30">30 days</option>
+                <option value="">No expiry</option>
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={saveStandingNote}
+                disabled={savingStandingNote || !standingNoteDraft.trim()}
+                className="flex-1 rounded-lg bg-white text-zinc-950 py-2 text-xs font-semibold hover:bg-zinc-200 transition-colors disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEditingStandingNote(false); setStandingNoteDraft(""); }}
+                className="rounded-lg border border-zinc-700 text-zinc-400 hover:text-white px-4 py-2 text-xs font-medium transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingStandingNote(true)}
+            className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+          >
+            + Set a standing directive (e.g. pause PRs while adjusting to new gear)
+          </button>
         )}
 
         {/* Session metadata */}

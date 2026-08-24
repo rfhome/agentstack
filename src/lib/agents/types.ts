@@ -48,6 +48,7 @@ export interface AgentInput {
   goals: { exercise: string; targetWeightLbs: number; targetReps: string }[];
   userContext: string;
   preWorkoutContext?: string; // athlete's note entered before requesting the workout plan
+  standingDirective?: string; // temporary athlete-set directive in effect across multiple sessions (e.g. "no PRs while adjusting to a wrist wrap")
   ouraContext?: string;
   fitbitContext?: string;
   appleHealthContext?: string;          // formatted Apple Health daily summaries (last 7 days)

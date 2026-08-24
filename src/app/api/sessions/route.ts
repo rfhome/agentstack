@@ -131,6 +131,31 @@ export async function POST(req: NextRequest) {
       include: { exercises: true, cardioActivities: true },
     }));
 
+    // Track exercise novelty: if this session includes something not performed in the
+    // last 90 days, bump lastNoveltyAt so the prescribe agent knows rotation is fresh.
+    const newExerciseNames = (exercises ?? [])
+      .map((e) => e.name.trim().toLowerCase())
+      .filter(Boolean);
+    if (newExerciseNames.length > 0) {
+      const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      const priorSessions = await withRLS(authSession.user.id, (db) =>
+        db.session.findMany({
+          where: { userId: authSession.user.id, id: { not: created.id }, date: { gte: ninetyDaysAgo } },
+          select: { exercises: { select: { name: true } } },
+        })
+      );
+      const priorNames = new Set(
+        priorSessions.flatMap((s) => s.exercises.map((e) => e.name.trim().toLowerCase()))
+      );
+      const hasNovelExercise = newExerciseNames.some((n) => !priorNames.has(n));
+      if (hasNovelExercise) {
+        await prisma.user.update({
+          where: { id: authSession.user.id },
+          data: { lastNoveltyAt: created.date },
+        });
+      }
+    }
+
     // Fetch Oura recovery data for this session date in the background (non-blocking)
     const ouraConn = await prisma.wearableConnection.findUnique({
       where: { userId_provider: { userId: authSession.user.id, provider: "oura" } },

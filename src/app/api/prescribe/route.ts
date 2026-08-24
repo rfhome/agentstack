@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRLS } from "@/lib/prisma-rls";
+import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
-import { getUserContext } from "@/lib/context/userProfile";
+import { getUserContext, getStandingDirective } from "@/lib/context/userProfile";
 import { detectInjection } from "@/lib/security";
 import OpenAI from "openai";
 
@@ -41,7 +42,11 @@ Return only valid JSON with this exact structure, no markdown, no preamble:
 
 The "weights" field is per-set weights as a comma-separated string. Use progressive loading when appropriate. Base prescriptions on the user's actual recent history and goals. For the warm-up, always include 2-3 dynamic movements relevant to the day's muscle groups.
 
-If a "todayContext" field is present in the input, treat it as important athlete-provided context that should influence the prescription — e.g. if they mention golfing tomorrow, reduce lower-body fatigue; if they mention a sore joint, avoid loading that area; if they mention a time constraint, tighten the session.`;
+If a "todayContext" field is present in the input, treat it as important athlete-provided context that should influence the prescription — e.g. if they mention golfing tomorrow, reduce lower-body fatigue; if they mention a sore joint, avoid loading that area; if they mention a time constraint, tighten the session.
+
+If a "standingDirective" field is present, it is a temporary rule the athlete set that spans multiple sessions (e.g. "no PRs while adjusting to a wrist wrap for the next couple cycles"). It overrides default progressive-overload behavior until it expires — hold weights flat and do not chase a new PR while it's active, even if history would otherwise suggest an increase.
+
+If a "daysSinceRotation" field is present and is greater than 60, AND the user's context mentions valuing periodic exercise rotation or variety (e.g. avoiding monotony, mixing familiar and new movements), you should proactively swap ONE exercise in today's session for a fresh but appropriate alternative that still fits the muscle group, cycle day, and the athlete's program — do not overhaul the whole session, and never do this if a standingDirective or todayContext suggests the athlete needs stability instead (e.g. recovering from injury, learning new equipment). When you make a rotation swap, say so explicitly in focusStatement (e.g. "swapped in X for variety per your training profile").`;
 
 const CYCLE_LABELS: Record<number, string> = { 1: "Push", 2: "Pull", 3: "Legs", 4: "Arms" };
 
@@ -61,7 +66,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Input contains disallowed content" }, { status: 400 });
     }
 
-    const [allRecentSessions, goals, userContext] = await withRLS(userId, (db) =>
+    const [allRecentSessions, goals, userContext, standingDirective, userRow] = await withRLS(userId, (db) =>
       Promise.all([
         db.session.findMany({
           where: { userId },
@@ -71,8 +76,15 @@ export async function GET(req: NextRequest) {
         }),
         db.goal.findMany({ where: { userId, achieved: false } }),
         getUserContext(userId, db),
+        getStandingDirective(userId, db),
+        prisma.user.findUnique({ where: { id: userId }, select: { lastNoveltyAt: true, createdAt: true } }),
       ])
     );
+
+    const noveltyBaseline = userRow?.lastNoveltyAt ?? userRow?.createdAt ?? null;
+    const daysSinceRotation = noveltyBaseline
+      ? Math.floor((Date.now() - noveltyBaseline.getTime()) / (24 * 60 * 60 * 1000))
+      : null;
 
     // Split: last 3 sessions for this specific cycle day (direct history) + recent other days for context
     const dayHistory = allRecentSessions.filter((s) => s.cycleDay === cycleDay).slice(0, 3);
@@ -105,6 +117,8 @@ export async function GET(req: NextRequest) {
       })),
       userContext,
       ...(workoutContext ? { todayContext: workoutContext } : {}),
+      ...(standingDirective ? { standingDirective } : {}),
+      ...(daysSinceRotation != null ? { daysSinceRotation } : {}),
     }, null, 2);
 
     const res = await client.chat.completions.create({

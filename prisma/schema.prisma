@@ -22,6 +22,7 @@ model User {
   profile         UserProfile?
   wearables       WearableConnection[]
   createdAt       DateTime         @default(now())
+  lastNoveltyAt   DateTime?        // last time a not-recently-performed exercise appeared in a session
 }
 
 model EmailVerification {
@@ -183,6 +184,8 @@ model UserProfile {
   context            String   @default("")
   programConfig      Json?
   onboardingComplete Boolean  @default(false)
+  standingNote            String?   // temporary athlete-set directive, separate from the permanent coaching profile
+  standingNoteExpiresAt   DateTime?
   updatedAt          DateTime @updatedAt
 }
 
