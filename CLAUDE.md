@@ -70,6 +70,16 @@ Multi-agent AI fitness platform. Next.js App Router + TypeScript + Tailwind + Pr
 - `GET /api/stats` returns `StreakStats + goalsAchieved`; queries all session dates + achieved goal count
 - `StreaksCard` component fetches `/api/stats` on mount and renders a 2×2/4-col stat grid
 
+### Standing directive
+- `UserProfile.standingNote String?` + `standingNoteExpiresAt DateTime?` — a temporary, multi-session athlete directive (e.g. "no PRs while adjusting to a wrist wrap"), separate from the permanent coaching profile (`userContext`)
+- `GET/PUT/DELETE /api/standing-note` — PUT scans the note with `detectInjection()`, computes `expiresAt = days != null ? now + days*24h : null` (`null` = no expiry, cleared manually)
+- "Still active" is lazy/computed-on-read: `GET` and the shared helper both compare `standingNoteExpiresAt` to `new Date()` — there is no cron/cleanup job
+- Shared helper `src/lib/context/userProfile.ts` returns the note (or `null` if missing/expired) — used by `/api/analyze` and `/api/prescribe` to inject `standingDirective` into all four agent prompts (Pulse, Forge, Lens, Nexus) until expiry
+- Editable card lives on `/fitness/log` (`src/app/fitness/log/page.tsx`); it is profile-level, not session-scoped, so it reflects the *current* directive, not what was active on a past session — don't show it on historical session views expecting a point-in-time snapshot
+
+### Exercise rotation tracking
+- Session logging tracks exercise novelty so Forge can proactively rotate in a fresh movement when the user's profile values variety and nothing new has appeared in 60+ days (`src/app/api/prescribe/route.ts`)
+
 ### Access tiers + promo codes
 - `User.tier String @default("free")` — values: `"free"` | `"beta"` | `"premium"`
 - `PromoCode` model: `code String @unique`, `tier`, `maxUses`, `usedCount`, `expiresAt?`

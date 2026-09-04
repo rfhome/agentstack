@@ -603,6 +603,25 @@ function LogSessionPageInner() {
           </div>
         )}
 
+        {notes.trim() && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Post-session notes</p>
+            <p className="text-sm text-zinc-400 italic">&ldquo;{notes.trim()}&rdquo;</p>
+          </div>
+        )}
+
+        {standingNote && (
+          <div className="rounded-xl border border-blue-800 bg-blue-900/20 p-3">
+            <p className="text-xs text-blue-400 uppercase tracking-wide font-medium mb-1">Standing directive</p>
+            <p className="text-sm text-zinc-200">{standingNote}</p>
+            <p className="text-xs text-zinc-500 mt-1">
+              {standingNoteExpiresAt
+                ? `Active until ${new Date(standingNoteExpiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                : "No expiry — clear manually when done"}
+            </p>
+          </div>
+        )}
+
         {/* Goal achievements */}
         {result.achievedGoals && result.achievedGoals.length > 0 && (
           <div className="rounded-xl border border-emerald-800 bg-emerald-900/20 p-4 space-y-2">
@@ -811,6 +830,25 @@ function LogSessionPageInner() {
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
             <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Pre-session note</p>
             <p className="text-sm text-zinc-400 italic">&ldquo;{workoutContext.trim()}&rdquo;</p>
+          </div>
+        )}
+
+        {notes.trim() && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wide mb-1">Post-session notes</p>
+            <p className="text-sm text-zinc-400 italic">&ldquo;{notes.trim()}&rdquo;</p>
+          </div>
+        )}
+
+        {standingNote && (
+          <div className="rounded-xl border border-blue-800 bg-blue-900/20 p-4">
+            <p className="text-xs text-blue-400 uppercase tracking-wide font-medium mb-1">Standing directive</p>
+            <p className="text-sm text-zinc-200">{standingNote}</p>
+            <p className="text-xs text-zinc-500 mt-1">
+              {standingNoteExpiresAt
+                ? `Active until ${new Date(standingNoteExpiresAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+                : "No expiry — clear manually when done"}
+            </p>
           </div>
         )}
       </div>

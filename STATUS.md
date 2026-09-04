@@ -1,6 +1,6 @@
 # AgentStack — Current Status
 
-_Last updated: 2026-07-21_
+_Last updated: 2026-09-04_
 
 ## What this app is
 
@@ -17,24 +17,15 @@ Wearables: Oura Ring (OAuth), Fitbit/Google Fit (OAuth), Apple Health (webhook v
 
 The app is fully functional and being used daily. Core loop (log → analyze → review) is stable. Railway proxy timeout issue was resolved in a prior session via async fire-and-forget analysis (POST returns 202, client polls status endpoint every 3s).
 
-## What was built / fixed in the last session (2026-07-21)
+## What was built / fixed in the last session (2026-09-04)
 
-- **Weekly summary rendering fix** — Nexus was outputting preamble text before JSON; `max_tokens` was too low (1024) causing truncation before JSON closed. Fixed: raised to 4096, tightened prompt to suppress preamble.
-- **Weekly summary auto-generation** — `POST /api/internal/weekly-summary-cron` secured by `CRON_SECRET`; loops all active users; skips users with no sessions that week (no fitness-shaming); skips users already summarized this week. Railway cron service created, scheduled `0 8 * * 0` (8am UTC Sunday).
-- **Encouraging tone rules** — added explicit non-judgmental tone guardrails to the weekly summary system prompt.
-- **"Looks like a rest week" message** — friendly 200 response (not 500) when user manually triggers summary on a week with no sessions.
-- **"New" badge** — shown on weekly summary card when generated since the most recent Sunday.
-- **Copyright footer** — `© [year] AgentStack. All rights reserved.` in root layout.
-- **`/dev-cycle-finish` global skill** — created at `~/.claude/commands/dev-cycle-finish.md`; applies across all projects.
+- **Post-session notes + standing directive on analysis screens** — the "Nexus synthesizing…" and "Analysis Complete" screens on `/fitness/log` previously showed only the pre-session note. Added matching read-only cards for post-session `notes` and the active `standingNote` (if any), reusing existing component state — no new API surface. `src/app/fitness/log/page.tsx`.
+- **Docs catch-up** — the 2026-08-24 standing-directive/exercise-rotation commit had shipped without STATUS.md/FEATURES.md/CLAUDE.md updates; backfilled below.
 
-## What was built / fixed in the previous session (2026-07-12)
+## What was built / fixed in the previous session (2026-08-24)
 
-- **Weekly summary rendering fix** — Nexus was outputting preamble text before JSON; `max_tokens` was too low (1024) causing truncation before JSON closed. Fixed: raised to 4096, tightened prompt to suppress preamble.
-- **Weekly summary auto-generation** — `POST /api/internal/weekly-summary-cron` secured by `CRON_SECRET`; loops all active users; skips users with no sessions that week (no fitness-shaming); skips users already summarized this week. Railway cron service created, scheduled `0 8 * * 0` (8am UTC Sunday).
-- **Encouraging tone rules** — added explicit non-judgmental tone guardrails to the weekly summary system prompt.
-- **"Looks like a rest week" message** — friendly 200 response (not 500) when user manually triggers summary on a week with no sessions.
-- **"New" badge** — shown on weekly summary card when generated since the most recent Sunday.
-- **Copyright footer** — `© [year] AgentStack. All rights reserved.` in root layout.
+- **Standing directive** — athletes can set a temporary, multi-session directive (e.g. "no PRs while adjusting to a wrist wrap") woven into every agent prompt (Pulse, Forge, Lens, Nexus) until it expires. New `GET/PUT/DELETE /api/standing-note` endpoint + editable card on the log page. Lazy expiry (compared to `now` on read), no cleanup job.
+- **Exercise rotation tracking** — sessions track exercise novelty so Forge can proactively rotate in a fresh movement when a user's profile values variety and nothing new has appeared in 60+ days.
 
 ## Open follow-ups
 
@@ -43,7 +34,7 @@ _(none — Railway cron and CRON_SECRET are confirmed working)_
 
 ### Near-term backlog
 - [ ] **Help page screenshots** — user will take screenshots during a session and provide them; wire into `src/app/help/page.tsx` replacing `<Screenshot>` placeholder components with Next.js `<Image>` tags pointing to files in `public/`.
-- [ ] **Pre-workout context on sessions history page** — currently displayed in the analyzing/done screen; consider showing it inline in past session detail views as well.
+- [ ] **Pre-workout context on sessions history page** — `preWorkoutContext` still isn't selected/typed/rendered anywhere in the History flow (`src/app/fitness/sessions/page.tsx` → `HistoryTabs.tsx` → `SessionHistoryCard.tsx`); would need a Prisma select + serialize + type addition end-to-end. (Post-session `notes` is already shown there; `standingNote` is profile-level/current-only, not a historical session snapshot, so it doesn't belong on past-session views as-is.)
 - [ ] **Goals editing UI** — edit target weight/reps on existing goals. Currently only add / mark-achieved / delete is supported (`src/app/profile/page.tsx`).
 - [ ] **Web Push notifications** — notify user on phone when async analysis completes. Requires service worker + push subscription per device.
 - [ ] **Privacy policy page** — app collects health data, wearable tokens, and email. Legally required in most jurisdictions before going public.
@@ -72,6 +63,7 @@ _(none — Railway cron and CRON_SECRET are confirmed working)_
 
 ## Known quirks
 - `preWorkoutContext` is saved to Session at creation time — it is NOT re-sent on re-analyze (the analyze route reads it from DB, not the client), so edits after the initial save are not reflected
+- `standingNote`/`standingNoteExpiresAt` live on `UserProfile`, not `Session` — it's the *current* directive, not a per-session snapshot; a past session's analysis screen won't show what was active when that session ran, only what's active now
 - `UserProfile.userId` is `String? @unique` (nullable) — always use `findFirst + update/create`, never `upsert`
 - Oura API v2 uses `day` field, not `date` — use `r.day ?? r.date` everywhere
 - Never run `prisma migrate dev` — schema managed via `prisma db push`
